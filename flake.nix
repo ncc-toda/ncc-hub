@@ -31,7 +31,7 @@
             pname = "works-server";
             version = "0.1.0";
             src = ./server;
-            vendorHash = pkgs.lib.fakeHash;
+            vendorHash = "sha256-KnDWngI1FPXHxZ6rHItZry3QX2TYWX06mHdC4/jWrrI=";
             subPackages = [ "cmd/server" ];
             nativeBuildInputs = [ pkgs.makeWrapper ];
             postInstall = ''
@@ -45,7 +45,7 @@
             pname = "works-web";
             version = "0.1.0";
             src = ./web;
-            npmDepsHash = pkgs.lib.fakeHash;
+            npmDepsHash = "sha256-RWV/4NwxGEEsAv9j/9C9PD30HcnAULvHjjKlrmFXz9s=";
             installPhase = ''
               runHook preInstall
               mkdir -p $out
