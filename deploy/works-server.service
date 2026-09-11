@@ -1,0 +1,24 @@
+[Unit]
+Description=campus works showcase
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=works
+Group=works
+WorkingDirectory=/var/lib/works
+ExecStart=/opt/works/current/bin/works-server serve \
+  --http=127.0.0.1:8090 \
+  --dir=/var/lib/works/pb_data \
+  --publicDir=/opt/works/current/share/works/pb_public
+Restart=always
+RestartSec=5
+Environment=WORKS_FFMPEG_THREADS=2
+# ハードニング
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/works
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
