@@ -11,7 +11,12 @@ import (
 	"github.com/pocketbase/pocketbase/plugins/migratecmd"
 	"github.com/pocketbase/pocketbase/tools/hook"
 
+	"github.com/ncc-toda/ncc-hub/server/internal/auth"
+	"github.com/ncc-toda/ncc-hub/server/internal/likes"
+	"github.com/ncc-toda/ncc-hub/server/internal/media"
 	_ "github.com/ncc-toda/ncc-hub/server/internal/migrations"
+	"github.com/ncc-toda/ncc-hub/server/internal/upload"
+	"github.com/ncc-toda/ncc-hub/server/internal/works"
 )
 
 func main() {
@@ -29,6 +34,13 @@ func main() {
 		Dir:         "internal/migrations",
 		Automigrate: automigrate,
 	})
+
+	// 標準 Records API のフック(合言葉ゲート・監査ログ)とカスタムルート・cron。
+	auth.RegisterHooks(app)
+	works.Register(app)
+	upload.Register(app)
+	media.Register(app)
+	likes.Register(app)
 
 	// 静的フロント配信(SPA fallback あり)。カスタムルートより後に評価されるよう優先度を下げる。
 	app.OnServe().Bind(&hook.Handler[*core.ServeEvent]{
