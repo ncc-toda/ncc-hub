@@ -99,8 +99,9 @@
   }
 
   .bar {
-    height: 10px;
-    border-radius: 999px;
+    height: 14px;
+    border: 2px solid var(--border);
+    border-radius: 3px;
     background: var(--surface-2);
     overflow: hidden;
   }
@@ -108,7 +109,6 @@
   .fill {
     height: 100%;
     background: var(--accent);
-    border-radius: 999px;
     transition: width 0.3s ease;
   }
 

@@ -261,12 +261,13 @@
 
   .gallery-item {
     padding: 0;
-    border: 1px solid var(--border);
-    border-radius: 8px;
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
     overflow: hidden;
     cursor: zoom-in;
     background: var(--surface-2);
     aspect-ratio: 3 / 2;
+    box-shadow: 2px 2px 0 var(--shadow-c);
   }
 
   .gallery-item img {
@@ -289,7 +290,8 @@
 
   .tag {
     background: var(--surface-2);
-    color: var(--muted);
+    color: var(--text);
+    border-color: var(--border-soft);
   }
 
   .like-area {

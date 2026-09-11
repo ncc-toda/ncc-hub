@@ -157,8 +157,8 @@
     justify-content: space-between;
     gap: 10px;
     flex-wrap: wrap;
-    border: 1px solid var(--border);
-    border-radius: 8px;
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
     padding: 10px 12px;
   }
 

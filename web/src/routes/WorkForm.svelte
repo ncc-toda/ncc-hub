@@ -867,7 +867,8 @@
   .thumb-item {
     position: relative;
     aspect-ratio: 1;
-    border-radius: 8px;
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
     overflow: hidden;
     border: 1px solid var(--border);
   }
@@ -891,7 +892,7 @@
     background: rgba(0, 0, 0, 0.65);
     color: #fff;
     border: none;
-    border-radius: 999px;
+    border-radius: var(--radius);
     min-width: 26px;
     height: 26px;
     padding: 0 6px;
@@ -921,21 +922,25 @@
   }
 
   .author-box {
-    border: 2px solid var(--accent);
+    border: 2px solid var(--border);
     border-radius: var(--radius);
+    background: var(--surface);
+    box-shadow: var(--shadow);
     padding: 14px 16px 4px;
     margin: 24px 0;
   }
 
   .author-box legend {
-    font-weight: 700;
-    padding: 0 6px;
+    font-weight: 900;
+    padding: 0 8px;
+    background: var(--surface);
   }
 
   .author-note {
     background: var(--warn-bg);
     color: var(--warn-text);
-    border-radius: 8px;
+    border: 1px solid var(--border-soft);
+    border-radius: 3px;
     padding: 8px 12px;
     font-size: 0.9rem;
     font-weight: 700;
@@ -972,7 +977,8 @@
     align-items: center;
     gap: 10px;
     background: var(--surface-2);
-    border-radius: 8px;
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
     padding: 14px 16px;
   }
 
@@ -987,7 +993,7 @@
   .warn-text {
     color: var(--warn-text);
     background: var(--warn-bg);
-    border-radius: 8px;
+    border-radius: var(--radius);
     padding: 10px 14px;
     font-size: 0.9rem;
     margin: 0;

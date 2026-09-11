@@ -66,8 +66,7 @@
     position: fixed;
     inset: 0;
     z-index: 100;
-    background: color-mix(in srgb, var(--bg) 70%, transparent);
-    backdrop-filter: blur(4px);
+    background: color-mix(in srgb, var(--shadow-c, #251f19) 45%, transparent);
     display: flex;
     align-items: center;
     justify-content: center;

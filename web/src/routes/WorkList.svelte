@@ -56,7 +56,7 @@
   {#snippet children({ event })}
     <div class="list-head">
       <div class="head-row">
-        <h1>{event.name}</h1>
+        <h1><span class="hl">{event.name}</span></h1>
         {#if event.submissions_open}
           <a class="btn btn-primary" href={`/e/${slug}/new`} onclick={onLinkClick}>投稿する</a>
         {:else}
@@ -111,7 +111,7 @@
 <style>
   .list-head h1 {
     margin: 0;
-    font-size: 1.3rem;
+    font-size: 1.45rem;
   }
 
   .head-row {
@@ -127,6 +127,7 @@
     background: var(--surface-2);
     color: var(--muted);
     padding: 8px 16px;
+    border-style: dashed;
   }
 
   .event-desc {
@@ -153,7 +154,7 @@
   .grid {
     display: grid;
     grid-template-columns: 1fr;
-    gap: 14px;
+    gap: 18px;
   }
 
   @media (min-width: 560px) {

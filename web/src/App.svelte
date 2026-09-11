@@ -23,7 +23,7 @@
 
 <header class="topbar">
   <div class="topbar-inner">
-    <a class="brand" href={homeHref} onclick={onLinkClick}>作品ひろば</a>
+    <a class="brand" href={homeHref} onclick={onLinkClick}><span class="brand-mark" aria-hidden="true"></span>作品ひろば</a>
     <a class="gear" href="/keys" onclick={onLinkClick} aria-label="編集キーを管理" title="編集キーを管理">
       <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
         <path
@@ -64,7 +64,7 @@
     top: 0;
     z-index: 50;
     background: var(--surface);
-    border-bottom: 1px solid var(--border);
+    border-bottom: 2px solid var(--border);
   }
 
   .topbar-inner {
@@ -77,13 +77,29 @@
   }
 
   .brand {
-    font-weight: 800;
-    font-size: 1.05rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 900;
+    font-size: 1.1rem;
+    letter-spacing: 0.04em;
     color: var(--text);
+  }
+
+  .brand-mark {
+    width: 12px;
+    height: 12px;
+    background: var(--accent);
+    border: 2px solid var(--border);
+    flex-shrink: 0;
   }
 
   .brand:hover {
     text-decoration: none;
+  }
+
+  .brand:hover .brand-mark {
+    background: var(--marker);
   }
 
   .gear {
@@ -91,7 +107,7 @@
     display: flex;
     align-items: center;
     padding: 8px;
-    border-radius: 999px;
+    border-radius: var(--radius);
   }
 
   .gear:hover {

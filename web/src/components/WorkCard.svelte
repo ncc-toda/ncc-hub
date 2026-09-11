@@ -58,12 +58,15 @@
     flex-direction: column;
     overflow: hidden;
     color: inherit;
-    transition: transform 0.1s ease;
+    transition:
+      transform 0.1s ease,
+      box-shadow 0.1s ease;
   }
 
   .work-card:hover {
     text-decoration: none;
-    transform: translateY(-2px);
+    transform: translate(-2px, -2px);
+    box-shadow: 6px 6px 0 var(--shadow-c);
   }
 
   .thumb {
@@ -96,8 +99,9 @@
   }
 
   .overlay-badge.video {
-    background: rgba(0, 0, 0, 0.65);
-    color: #fff;
+    background: var(--text);
+    color: var(--bg);
+    border-color: var(--border);
   }
 
   .overlay-badge.processing {
@@ -111,12 +115,13 @@
     justify-content: space-between;
     gap: 8px;
     padding: 10px 12px;
+    border-top: 2px solid var(--border);
   }
 
   .title {
     margin: 0;
     font-size: 0.95rem;
-    font-weight: 700;
+    font-weight: 800;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     line-clamp: 2;

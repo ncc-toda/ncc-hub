@@ -73,7 +73,7 @@
     background: rgba(255, 255, 255, 0.12);
     color: #fff;
     border: none;
-    border-radius: 999px;
+    border-radius: var(--radius);
     width: 44px;
     height: 44px;
     font-size: 1.5rem;
@@ -111,6 +111,6 @@
     font-size: 0.85rem;
     background: rgba(0, 0, 0, 0.5);
     padding: 2px 12px;
-    border-radius: 999px;
+    border-radius: 3px;
   }
 </style>
