@@ -113,7 +113,10 @@
     {:else if work}
       <article>
         <header class="work-head">
-          <h1>{work.title}</h1>
+          <div class="head-text">
+            <h1>{work.title}</h1>
+            <p class="posted">投稿日：{new Date(work.created).toLocaleDateString('ja-JP')}</p>
+          </div>
           {#if hasEditKey}
             <a class="btn btn-sm" href={`/e/${slug}/w/${work.id}/edit`} onclick={onLinkClick}>編集</a>
           {/if}
@@ -202,8 +205,6 @@
             }}
           />
         </div>
-
-        <p class="posted">投稿日：{new Date(work.created).toLocaleDateString('ja-JP')}</p>
       </article>
 
       {#if lightboxIndex >= 0}
@@ -214,34 +215,54 @@
 </EventGuard>
 
 <style>
+  /*
+   * 読み幅を 720px に制限し、縦方向はセクション間 32px / 関連要素間 8-16px のリズムで組む
+   */
+  article {
+    max-width: 720px;
+  }
+
   .back {
-    margin: 0 0 8px;
+    margin: 0 0 24px;
+    font-size: 0.9rem;
   }
 
   .work-head {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 12px;
+    gap: 24px;
+    margin-bottom: 24px;
   }
 
   .work-head h1 {
     margin: 0;
-    font-size: 1.35rem;
+    font-size: 1.5rem;
+  }
+
+  .work-head .btn {
+    flex-shrink: 0;
+    margin-top: 4px;
+  }
+
+  .posted {
+    margin: 4px 0 0;
+    color: var(--muted);
+    font-size: 0.85rem;
   }
 
   video {
     width: 100%;
     border-radius: var(--radius);
     background: #000;
-    margin-bottom: 12px;
+    margin: 0 0 24px;
+    display: block;
   }
 
   .yt-wrap {
     position: relative;
     aspect-ratio: 16 / 9;
-    margin-bottom: 12px;
+    margin: 0 0 24px;
   }
 
   .yt-wrap iframe {
@@ -254,20 +275,19 @@
 
   .gallery {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: 8px;
-    margin: 12px 0;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 12px;
+    margin: 0 0 24px;
   }
 
   .gallery-item {
     padding: 0;
-    border: 2px solid var(--border);
+    border: var(--hairline);
     border-radius: var(--radius);
     overflow: hidden;
     cursor: zoom-in;
-    background: var(--surface-2);
+    background: var(--fill);
     aspect-ratio: 3 / 2;
-    box-shadow: 2px 2px 0 var(--shadow-c);
   }
 
   .gallery-item img {
@@ -278,28 +298,34 @@
   }
 
   .description {
-    margin: 16px 0;
+    margin: 32px 0;
   }
 
+  .demo {
+    margin: 32px 0;
+  }
+
+  /* タグは囲みを使わず太字テキストで示す */
   .tags {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
-    margin: 12px 0;
+    gap: 8px 20px;
+    margin: 32px 0 0;
   }
 
   .tag {
-    background: var(--surface-2);
-    color: var(--text);
-    border-color: var(--border-soft);
+    border: none;
+    background: none;
+    padding: 0;
+    font-size: 0.9rem;
+    font-weight: 700;
+  }
+
+  .tag::before {
+    content: '#';
   }
 
   .like-area {
-    margin: 20px 0 8px;
-  }
-
-  .posted {
-    color: var(--muted);
-    font-size: 0.85rem;
+    margin: 32px 0 0;
   }
 </style>

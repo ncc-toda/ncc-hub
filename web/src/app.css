@@ -1,50 +1,51 @@
 /*
- * デザイン方針: 文化祭ポスター風「インク & 紙」
- * - 生成り紙の背景にインク色の 2px 実線ボーダー、オフセットのハードシャドウ
- * - アクセントは朱色、差し色に山吹(マーカー風ハイライト)
- * - 角丸は最小限(4px)。ピル型・グラデーション・ぼかし影は使わない
+ * デザイン方針: シンプルスタイリッシュ（class_document のデザインルール準拠 + 角丸)
+ * - 白 #FFF × 黒 #111。アクセントは VS Code ブルー #007ACC の 1 色だけ
+ * - アクセントは「大きく・少なく」: 主ボタンの全面塗りといいね状態のみ。薄い版・グラデーションを作らない
+ * - 囲みは 0.5px のヘアライン罫。影・装飾なし。角丸 10px
+ * - フォントは LINE Seed JP(見出し 800 / 本文 400)
  */
+@import url('https://fonts.googleapis.com/css2?family=LINE+Seed+JP:wght@400;700;800&display=swap');
+
 :root {
   color-scheme: light dark;
-  --bg: #f5efe3;
-  --surface: #fffcf4;
-  --surface-2: #ece4d2;
-  --text: #251f19;
-  --muted: #71685a;
-  --border: #251f19;
-  --border-soft: #d8cdb8;
-  --accent: #d8401f;
-  --accent-strong: #b23214;
-  --accent-text: #fffcf4;
-  --marker: #f7c948;
-  --danger: #b3261e;
-  --like: #d8401f;
-  --warn-bg: #fbeec9;
-  --warn-text: #251f19;
-  --shadow-c: #251f19;
-  --shadow: 4px 4px 0 var(--shadow-c);
-  --radius: 4px;
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --fill: #f2f2f0;
+  --surface-2: #f2f2f0;
+  --text: #111111;
+  --muted: #55524e;
+  --border: #111111;
+  --border-soft: #d9d7d2;
+  --hairline: 0.5px solid var(--border);
+  --accent: #007acc;
+  --accent-strong: #006bb3;
+  --accent-text: #ffffff;
+  --danger: #c0392b;
+  --like: #007acc;
+  --warn-bg: #f2f2f0;
+  --warn-text: #111111;
+  --radius: 10px;
+  --radius-sm: 6px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #1b1611;
-    --surface: #242019;
-    --surface-2: #2f2a20;
-    --text: #f1e8d8;
-    --muted: #a39888;
-    --border: #e5dac5;
-    --border-soft: #4d4536;
-    --accent: #ef5a35;
-    --accent-strong: #f2734f;
-    --accent-text: #1b1611;
-    --marker: #7a6320;
-    --danger: #f08575;
-    --like: #ef5a35;
-    --warn-bg: #3d3418;
-    --warn-text: #f1e8d8;
-    --shadow-c: rgba(0, 0, 0, 0.55);
-    --shadow: 4px 4px 0 var(--shadow-c);
+    --bg: #131313;
+    --surface: #131313;
+    --fill: #222220;
+    --surface-2: #222220;
+    --text: #f5f5f3;
+    --muted: #b0aca6;
+    --border: #f5f5f3;
+    --border-soft: #3b3a37;
+    --accent: #3794ff;
+    --accent-strong: #5ea6fa;
+    --accent-text: #ffffff;
+    --danger: #e57368;
+    --like: #3794ff;
+    --warn-bg: #222220;
+    --warn-text: #f5f5f3;
   }
 }
 
@@ -62,15 +63,15 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family:
+    'LINE Seed JP',
     system-ui,
     -apple-system,
-    "Segoe UI",
-    Roboto,
-    "Hiragino Kaku Gothic ProN",
-    "Hiragino Sans",
+    'Hiragino Kaku Gothic ProN',
+    'Hiragino Sans',
     Meiryo,
     sans-serif;
-  line-height: 1.7;
+  line-height: 1.65;
+  font-weight: 400;
   -webkit-font-smoothing: antialiased;
   overflow-wrap: anywhere;
 }
@@ -83,7 +84,6 @@ a {
 a:hover {
   text-decoration: underline;
   text-underline-offset: 3px;
-  text-decoration-thickness: 2px;
 }
 
 img,
@@ -94,8 +94,8 @@ video {
 h1,
 h2,
 h3 {
-  line-height: 1.35;
-  font-weight: 900;
+  line-height: 1.4;
+  font-weight: 800;
   letter-spacing: 0.01em;
 }
 
@@ -110,9 +110,9 @@ select {
   font: inherit;
   color: var(--text);
   background: var(--surface);
-  border: 2px solid var(--border);
+  border: var(--hairline);
   border-radius: var(--radius);
-  padding: 9px 12px;
+  padding: 10px 14px;
   width: 100%;
 }
 
@@ -120,13 +120,12 @@ input:focus-visible,
 textarea:focus-visible,
 select:focus-visible {
   outline: none;
-  border-color: var(--accent);
+  border: 1.5px solid var(--accent);
 }
 
 input::placeholder,
 textarea::placeholder {
   color: var(--muted);
-  opacity: 0.8;
 }
 
 textarea {
@@ -138,22 +137,15 @@ button {
 }
 
 .container {
-  max-width: 1100px;
+  max-width: 1060px;
   margin: 0 auto;
-  padding: 20px 16px 48px;
-}
-
-/* マーカー風ハイライト(見出し用) */
-.hl {
-  background: linear-gradient(transparent 62%, var(--marker) 62%, var(--marker) 94%, transparent 94%);
-  padding: 0 2px;
+  padding: 32px 20px 64px;
 }
 
 .card {
   background: var(--surface);
-  border: 2px solid var(--border);
+  border: var(--hairline);
   border-radius: var(--radius);
-  box-shadow: var(--shadow);
 }
 
 .btn {
@@ -161,42 +153,37 @@ button {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 9px 18px;
+  padding: 10px 22px;
   min-height: 44px;
-  border: 2px solid var(--border);
+  border: var(--hairline);
   border-radius: var(--radius);
   background: var(--surface);
   color: var(--text);
   cursor: pointer;
   text-decoration: none;
   font-weight: 700;
-  box-shadow: 3px 3px 0 var(--shadow-c);
-  transition:
-    transform 0.08s ease,
-    box-shadow 0.08s ease;
 }
 
 .btn:hover {
   text-decoration: none;
-  transform: translate(-1px, -1px);
-  box-shadow: 4px 4px 0 var(--shadow-c);
-}
-
-.btn:active {
-  transform: translate(2px, 2px);
-  box-shadow: 1px 1px 0 var(--shadow-c);
+  background: var(--fill);
 }
 
 .btn:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
-  transform: none;
-  box-shadow: 3px 3px 0 var(--shadow-c);
+  background: var(--surface);
 }
 
 .btn-primary {
   background: var(--accent);
+  border-color: var(--accent);
   color: var(--accent-text);
+}
+
+.btn-primary:hover {
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
 }
 
 .btn-danger {
@@ -205,30 +192,28 @@ button {
   color: var(--danger);
 }
 
-.btn-sm {
-  padding: 5px 12px;
-  min-height: 34px;
-  font-size: 0.85rem;
-  box-shadow: 2px 2px 0 var(--shadow-c);
+.btn-danger:hover {
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface));
 }
 
-.btn-sm:hover {
-  box-shadow: 3px 3px 0 var(--shadow-c);
+.btn-sm {
+  padding: 5px 14px;
+  min-height: 34px;
+  font-size: 0.85rem;
 }
 
 .badge {
   display: inline-block;
-  padding: 1px 8px;
-  border: 2px solid var(--border);
-  border-radius: 3px;
+  padding: 2px 10px;
+  border: var(--hairline);
+  border-radius: var(--radius-sm);
   font-size: 0.75rem;
   font-weight: 700;
-  letter-spacing: 0.03em;
   background: var(--surface);
 }
 
 .field {
-  margin-bottom: 18px;
+  margin-bottom: 20px;
 }
 
 .field > label,
@@ -241,33 +226,33 @@ button {
 
 .hint {
   color: var(--muted);
-  font-size: 0.85rem;
+  font-size: 0.84rem;
   margin: 4px 0 0;
 }
 
 .error-text {
   color: var(--danger);
-  font-weight: 600;
+  font-weight: 700;
   font-size: 0.9rem;
   margin: 4px 0 0;
 }
 
 .error-box {
-  background: color-mix(in srgb, var(--danger) 8%, var(--surface));
-  border: 2px solid var(--danger);
+  border: 1px solid var(--danger);
   border-radius: var(--radius);
   color: var(--danger);
-  font-weight: 600;
+  font-weight: 700;
   padding: 12px 16px;
   margin: 12px 0;
+  background: var(--surface);
 }
 
 .notice-box {
-  background: var(--warn-bg);
-  color: var(--warn-text);
-  border: 2px solid var(--border);
+  background: var(--fill);
+  color: var(--text);
+  border: none;
   border-radius: var(--radius);
-  font-weight: 600;
+  font-weight: 700;
   padding: 12px 16px;
   margin: 12px 0;
 }
@@ -284,15 +269,15 @@ button {
 }
 
 .markdown-body h1 {
-  font-size: 1.4rem;
+  font-size: 1.35rem;
 }
 
 .markdown-body h2 {
-  font-size: 1.25rem;
+  font-size: 1.2rem;
 }
 
 .markdown-body h3 {
-  font-size: 1.1rem;
+  font-size: 1.05rem;
 }
 
 .markdown-body p {
@@ -300,30 +285,29 @@ button {
 }
 
 .markdown-body pre {
-  background: var(--surface-2);
-  border: 1px solid var(--border-soft);
-  padding: 12px;
+  background: var(--fill);
+  border: none;
+  padding: 12px 14px;
   border-radius: var(--radius);
   overflow-x: auto;
 }
 
 .markdown-body code {
-  background: var(--surface-2);
-  padding: 1px 5px;
-  border-radius: 3px;
+  background: var(--fill);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
   font-size: 0.9em;
 }
 
 .markdown-body pre code {
   background: none;
-  border: none;
   padding: 0;
 }
 
 .markdown-body blockquote {
   margin: 0.8em 0;
-  padding: 4px 14px;
-  border-left: 4px solid var(--marker);
+  padding: 2px 14px;
+  border-left: 2px solid var(--border);
   color: var(--muted);
 }
 
@@ -336,6 +320,6 @@ button {
 
 .markdown-body th,
 .markdown-body td {
-  border: 1px solid var(--border-soft);
+  border: var(--hairline);
   padding: 6px 10px;
 }

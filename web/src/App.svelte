@@ -23,15 +23,8 @@
 
 <header class="topbar">
   <div class="topbar-inner">
-    <a class="brand" href={homeHref} onclick={onLinkClick}><span class="brand-mark" aria-hidden="true"></span>作品ひろば</a>
-    <a class="gear" href="/keys" onclick={onLinkClick} aria-label="編集キーを管理" title="編集キーを管理">
-      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-        <path
-          d="M12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7zm7.4-2.6c.05-.3.08-.6.08-.9s-.03-.6-.08-.9l2-1.6a.5.5 0 0 0 .12-.63l-1.9-3.3a.5.5 0 0 0-.6-.22l-2.37.95a7.3 7.3 0 0 0-1.55-.9l-.36-2.52a.5.5 0 0 0-.5-.42h-3.8a.5.5 0 0 0-.5.42l-.36 2.52c-.56.23-1.08.53-1.55.9l-2.37-.95a.5.5 0 0 0-.6.22l-1.9 3.3a.5.5 0 0 0 .12.63l2 1.6c-.05.3-.08.6-.08.9s.03.6.08.9l-2 1.6a.5.5 0 0 0-.12.63l1.9 3.3c.13.22.39.31.6.22l2.37-.95c.47.37.99.67 1.55.9l.36 2.52c.04.24.25.42.5.42h3.8c.25 0 .46-.18.5-.42l.36-2.52c.56-.23 1.08-.53 1.55-.9l2.37.95c.21.09.47 0 .6-.22l1.9-3.3a.5.5 0 0 0-.12-.63l-2-1.6z"
-          fill="currentColor"
-        />
-      </svg>
-    </a>
+    <a class="brand" href={homeHref} onclick={onLinkClick}>作品ひろば</a>
+    <a class="keys-link" href="/keys" onclick={onLinkClick}>編集キーを管理</a>
   </div>
 </header>
 
@@ -63,56 +56,36 @@
     position: sticky;
     top: 0;
     z-index: 50;
-    background: var(--surface);
-    border-bottom: 2px solid var(--border);
+    background: var(--bg);
+    border-bottom: var(--hairline);
   }
 
+  /* 版面: .container と同じ最大幅・左右余白に揃える */
   .topbar-inner {
-    max-width: 1100px;
+    max-width: 1060px;
+    height: 56px;
     margin: 0 auto;
-    padding: 10px 16px;
+    padding: 0 20px;
     display: flex;
     align-items: center;
     justify-content: space-between;
   }
 
   .brand {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    font-weight: 900;
-    font-size: 1.1rem;
-    letter-spacing: 0.04em;
+    font-weight: 800;
+    font-size: 1.05rem;
+    letter-spacing: 0.01em;
     color: var(--text);
-  }
-
-  .brand-mark {
-    width: 12px;
-    height: 12px;
-    background: var(--accent);
-    border: 2px solid var(--border);
-    flex-shrink: 0;
   }
 
   .brand:hover {
     text-decoration: none;
   }
 
-  .brand:hover .brand-mark {
-    background: var(--marker);
-  }
-
-  .gear {
-    color: var(--muted);
-    display: flex;
-    align-items: center;
-    padding: 8px;
-    border-radius: var(--radius);
-  }
-
-  .gear:hover {
+  .keys-link {
+    font-size: 0.85rem;
+    font-weight: 700;
     color: var(--text);
-    background: var(--surface-2);
   }
 
   .notfound {

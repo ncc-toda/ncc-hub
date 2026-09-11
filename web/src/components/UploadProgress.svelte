@@ -100,7 +100,7 @@
 
   .bar {
     height: 14px;
-    border: 2px solid var(--border);
+    border: var(--hairline);
     border-radius: 3px;
     background: var(--surface-2);
     overflow: hidden;

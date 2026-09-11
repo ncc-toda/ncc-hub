@@ -66,23 +66,29 @@
     position: fixed;
     inset: 0;
     z-index: 100;
-    background: color-mix(in srgb, var(--shadow-c, #251f19) 45%, transparent);
+    background: rgba(17, 17, 17, 0.5);
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 16px;
+    padding: 24px;
   }
 
   .gate {
     width: 100%;
     max-width: 420px;
-    padding: 24px;
+    padding: 32px 28px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 16px;
+    background: var(--bg);
   }
 
   .gate h2 {
+    margin: 0;
+    font-size: 1.25rem;
+  }
+
+  .gate .hint {
     margin: 0;
   }
 </style>

@@ -96,16 +96,16 @@
   .select-card {
     width: 100%;
     max-width: 420px;
-    padding: 28px 24px;
+    padding: 32px 28px;
   }
 
   .select-card h1 {
-    margin: 0 0 4px;
-    font-size: 1.5rem;
+    margin: 0 0 8px;
+    font-size: 1.4rem;
   }
 
   .select-card .btn {
     width: 100%;
-    margin-top: 8px;
+    margin-top: 16px;
   }
 </style>

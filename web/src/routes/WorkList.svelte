@@ -54,20 +54,20 @@
 
 <EventGuard {slug} onReady={load}>
   {#snippet children({ event })}
-    <div class="list-head">
-      <div class="head-row">
-        <h1><span class="hl">{event.name}</span></h1>
-        {#if event.submissions_open}
-          <a class="btn btn-primary" href={`/e/${slug}/new`} onclick={onLinkClick}>投稿する</a>
-        {:else}
-          <span class="badge closed">受付終了</span>
+    <div class="head-row">
+      <div class="head-text">
+        <h1>{event.name}</h1>
+        {#if event.description}
+          <div class="markdown-body event-desc">
+            <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+            {@html renderMarkdown(event.description)}
+          </div>
         {/if}
       </div>
-      {#if event.description}
-        <div class="markdown-body event-desc">
-          <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-          {@html renderMarkdown(event.description)}
-        </div>
+      {#if event.submissions_open}
+        <a class="btn btn-primary" href={`/e/${slug}/new`} onclick={onLinkClick}>投稿する</a>
+      {:else}
+        <span class="badge closed">受付終了</span>
       {/if}
     </div>
 
@@ -79,10 +79,14 @@
         bind:value={query}
         aria-label="タイトルで検索"
       />
-      <select bind:value={sortBy} aria-label="並び替え">
-        <option value="new">新着順</option>
-        <option value="likes">いいね順</option>
-      </select>
+      <nav class="sort" aria-label="並び替え">
+        <button type="button" class="sort-btn" class:active={sortBy === 'new'} onclick={() => (sortBy = 'new')}>
+          新着順
+        </button>
+        <button type="button" class="sort-btn" class:active={sortBy === 'likes'} onclick={() => (sortBy = 'likes')}>
+          いいね順
+        </button>
+      </nav>
     </div>
 
     {#if loading}
@@ -109,52 +113,84 @@
 </EventGuard>
 
 <style>
-  .list-head h1 {
-    margin: 0;
-    font-size: 1.45rem;
-  }
-
+  /*
+   * 余白の設計(8pxスケール):
+   *   見出しブロック → コントロール行: 32px / コントロール行 → グリッド: 24px
+   *   カード間: 24px。検索とソートは同じ 44px の高さラインに揃える
+   */
   .head-row {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
-    gap: 12px;
-    flex-wrap: wrap;
-    margin-bottom: 8px;
+    gap: 32px;
+  }
+
+  .head-row h1 {
+    margin: 0;
+    font-size: 1.6rem;
+  }
+
+  .head-row .btn {
+    flex-shrink: 0;
+    margin-top: 4px; /* h1 のキャップハイトに視覚的に揃える */
   }
 
   .badge.closed {
-    background: var(--surface-2);
+    flex-shrink: 0;
+    margin-top: 8px;
+    background: var(--fill);
     color: var(--muted);
+    border: none;
     padding: 8px 16px;
-    border-style: dashed;
   }
 
   .event-desc {
-    color: var(--muted);
-    font-size: 0.92rem;
-    margin-bottom: 12px;
+    margin-top: 8px;
+    font-size: 0.95rem;
+  }
+
+  .event-desc :global(p) {
+    margin: 0;
   }
 
   .controls {
     display: flex;
-    gap: 8px;
-    margin: 12px 0 16px;
+    align-items: center;
+    gap: 24px;
+    margin: 32px 0 24px;
   }
 
   .controls .search {
     flex: 1;
+    max-width: 480px;
+    min-height: 44px;
   }
 
-  .controls select {
-    width: auto;
-    flex-shrink: 0;
+  .sort {
+    display: flex;
+    gap: 20px;
+    margin-left: auto;
+  }
+
+  .sort-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 0.9rem;
+    font-weight: 400;
+    color: var(--muted);
+    cursor: pointer;
+  }
+
+  .sort-btn.active {
+    font-weight: 700;
+    color: var(--text);
   }
 
   .grid {
     display: grid;
     grid-template-columns: 1fr;
-    gap: 18px;
+    gap: 24px;
   }
 
   @media (min-width: 560px) {
@@ -169,9 +205,29 @@
     }
   }
 
-  @media (min-width: 1200px) {
-    .grid {
-      grid-template-columns: repeat(4, 1fr);
+  @media (max-width: 559px) {
+    .head-row {
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .head-row .btn {
+      margin-top: 0;
+      align-self: stretch;
+    }
+
+    .controls {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 12px;
+    }
+
+    .controls .search {
+      max-width: none;
+    }
+
+    .sort {
+      margin-left: 0;
     }
   }
 </style>

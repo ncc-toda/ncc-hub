@@ -58,21 +58,17 @@
     flex-direction: column;
     overflow: hidden;
     color: inherit;
-    transition:
-      transform 0.1s ease,
-      box-shadow 0.1s ease;
   }
 
   .work-card:hover {
     text-decoration: none;
-    transform: translate(-2px, -2px);
-    box-shadow: 6px 6px 0 var(--shadow-c);
+    background: var(--fill);
   }
 
   .thumb {
     position: relative;
     aspect-ratio: 3 / 2;
-    background: var(--surface-2);
+    background: var(--fill);
   }
 
   .thumb img {
@@ -94,34 +90,36 @@
 
   .overlay-badge {
     position: absolute;
-    top: 8px;
-    left: 8px;
+    top: 12px;
+    left: 12px;
+    border: none;
+    border-radius: var(--radius-sm);
   }
 
   .overlay-badge.video {
     background: var(--text);
     color: var(--bg);
-    border-color: var(--border);
   }
 
   .overlay-badge.processing {
-    background: var(--warn-bg);
-    color: var(--warn-text);
+    background: var(--bg);
+    color: var(--text);
   }
 
+  /* タイトルといいね数は同一ベースラインに揃える */
   .meta {
     display: flex;
-    align-items: flex-start;
+    align-items: baseline;
     justify-content: space-between;
-    gap: 8px;
-    padding: 10px 12px;
-    border-top: 2px solid var(--border);
+    gap: 16px;
+    padding: 12px 16px 14px;
+    border-top: var(--hairline);
   }
 
   .title {
     margin: 0;
     font-size: 0.95rem;
-    font-weight: 800;
+    font-weight: 700;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     line-clamp: 2;
@@ -131,15 +129,15 @@
 
   .likes {
     display: inline-flex;
-    align-items: center;
+    align-items: baseline;
     gap: 4px;
     color: var(--muted);
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     flex-shrink: 0;
-    padding-top: 2px;
   }
 
   .likes.liked {
     color: var(--like);
+    font-weight: 700;
   }
 </style>

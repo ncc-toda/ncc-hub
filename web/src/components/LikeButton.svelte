@@ -67,33 +67,23 @@
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    padding: 10px 20px;
-    min-height: 46px;
+    padding: 10px 22px;
+    min-height: 44px;
     border-radius: var(--radius);
-    border: 2px solid var(--border);
+    border: var(--hairline);
     background: var(--surface);
     color: var(--text);
     cursor: pointer;
     font-weight: 700;
-    box-shadow: 3px 3px 0 var(--shadow-c);
-    transition:
-      transform 0.08s ease,
-      box-shadow 0.08s ease;
   }
 
   .like-btn:hover {
-    transform: translate(-1px, -1px);
-    box-shadow: 4px 4px 0 var(--shadow-c);
-  }
-
-  .like-btn:active {
-    transform: translate(2px, 2px);
-    box-shadow: 1px 1px 0 var(--shadow-c);
+    background: var(--fill);
   }
 
   .like-btn.liked {
     color: var(--like);
-    background: color-mix(in srgb, var(--like) 10%, var(--surface));
+    border: 1.5px solid var(--like);
   }
 
   .like-btn:disabled {
@@ -102,6 +92,6 @@
   }
 
   .count {
-    font-size: 1.05rem;
+    font-size: 1rem;
   }
 </style>

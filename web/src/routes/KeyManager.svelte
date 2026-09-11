@@ -128,18 +128,19 @@
 
 <style>
   h1 {
-    font-size: 1.3rem;
-    margin: 0 0 4px;
+    font-size: 1.5rem;
+    margin: 0 0 8px;
   }
 
   .section {
-    padding: 16px;
-    margin: 16px 0;
+    max-width: 720px;
+    padding: 24px;
+    margin: 24px 0 0;
   }
 
   .section h2 {
     font-size: 1.05rem;
-    margin: 0 0 10px;
+    margin: 0 0 16px;
   }
 
   .key-list {
@@ -155,11 +156,11 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 10px;
+    gap: 16px;
     flex-wrap: wrap;
-    border: 2px solid var(--border);
+    background: var(--fill);
     border-radius: var(--radius);
-    padding: 10px 12px;
+    padding: 12px 16px;
   }
 
   .key-info {
@@ -186,9 +187,9 @@
   }
 
   .add-form {
-    margin-top: 18px;
-    border-top: 1px solid var(--border);
-    padding-top: 14px;
+    margin-top: 24px;
+    border-top: var(--hairline);
+    padding-top: 20px;
   }
 
   .add-form h3 {

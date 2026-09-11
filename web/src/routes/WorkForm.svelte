@@ -521,7 +521,7 @@
           </div>
         {/if}
 
-        <form onsubmit={submit} novalidate>
+        <form class="main-form" onsubmit={submit} novalidate>
           <div class="field">
             <label for="f-title">タイトル <span class="req">必須</span></label>
             <input id="f-title" type="text" bind:value={title} maxlength="60" />
@@ -794,13 +794,18 @@
 </EventGuard>
 
 <style>
+  form.main-form {
+    max-width: 720px;
+  }
+
   .back {
-    margin: 0 0 8px;
+    margin: 0 0 24px;
+    font-size: 0.9rem;
   }
 
   h1 {
-    font-size: 1.3rem;
-    margin: 0 0 16px;
+    font-size: 1.5rem;
+    margin: 0 0 32px;
   }
 
   .key-form {
@@ -841,9 +846,9 @@
   }
 
   .dropzone {
-    border: 2px dashed var(--border);
+    border: 1px dashed var(--border);
     border-radius: var(--radius);
-    padding: 20px 16px;
+    padding: 24px 16px;
     text-align: center;
     color: var(--muted);
   }
@@ -867,10 +872,9 @@
   .thumb-item {
     position: relative;
     aspect-ratio: 1;
-    border: 2px solid var(--border);
-    border-radius: var(--radius);
+    border: var(--hairline);
+    border-radius: var(--radius-sm);
     overflow: hidden;
-    border: 1px solid var(--border);
   }
 
   .thumb-item img {
@@ -902,9 +906,9 @@
 
   .video-mode {
     display: flex;
-    gap: 16px;
+    gap: 24px;
     flex-wrap: wrap;
-    margin-bottom: 8px;
+    margin-bottom: 12px;
   }
 
   .radio {
@@ -922,36 +926,33 @@
   }
 
   .author-box {
-    border: 2px solid var(--border);
+    border: var(--hairline);
     border-radius: var(--radius);
     background: var(--surface);
-    box-shadow: var(--shadow);
-    padding: 14px 16px 4px;
-    margin: 24px 0;
+    padding: 16px 20px 4px;
+    margin: 40px 0 0;
   }
 
   .author-box legend {
-    font-weight: 900;
+    font-weight: 800;
     padding: 0 8px;
-    background: var(--surface);
   }
 
   .author-note {
-    background: var(--warn-bg);
-    color: var(--warn-text);
-    border: 1px solid var(--border-soft);
-    border-radius: 3px;
+    background: var(--fill);
+    color: var(--text);
+    border-radius: var(--radius-sm);
     padding: 8px 12px;
     font-size: 0.9rem;
     font-weight: 700;
-    margin: 0 0 14px;
+    margin: 0 0 20px;
   }
 
   .submit-row {
     display: flex;
-    gap: 12px;
+    gap: 16px;
     align-items: center;
-    margin: 24px 0 40px;
+    margin: 32px 0 0;
   }
 
   .submit-btn {
@@ -975,11 +976,10 @@
   .key-display {
     display: flex;
     align-items: center;
-    gap: 10px;
-    background: var(--surface-2);
-    border: 2px dashed var(--border);
+    gap: 12px;
+    background: var(--fill);
     border-radius: var(--radius);
-    padding: 14px 16px;
+    padding: 16px 20px;
   }
 
   .key-display code {
@@ -991,11 +991,8 @@
   }
 
   .warn-text {
-    color: var(--warn-text);
-    background: var(--warn-bg);
-    border-radius: var(--radius);
-    padding: 10px 14px;
-    font-size: 0.9rem;
+    color: var(--text);
+    font-size: 0.88rem;
     margin: 0;
   }
 
