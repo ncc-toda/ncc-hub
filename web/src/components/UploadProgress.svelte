@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { formatBytes } from '../lib/format';
   import type { UploadSnapshot } from '../lib/upload';
 
   let {
@@ -18,13 +19,6 @@
   const percent = $derived(
     snapshot.totalBytes > 0 ? Math.floor((snapshot.sentBytes / snapshot.totalBytes) * 100) : 0,
   );
-
-  function fmtBytes(n: number): string {
-    if (n >= 1024 ** 3) return `${(n / 1024 ** 3).toFixed(2)} GB`;
-    if (n >= 1024 ** 2) return `${(n / 1024 ** 2).toFixed(1)} MB`;
-    if (n >= 1024) return `${(n / 1024).toFixed(0)} KB`;
-    return `${n} B`;
-  }
 
   const phaseLabel = $derived.by(() => {
     switch (snapshot.phase) {
@@ -56,7 +50,7 @@
   <div class="bar" role="progressbar" aria-valuenow={percent} aria-valuemin={0} aria-valuemax={100}>
     <div class="fill" style={`width:${percent}%`}></div>
   </div>
-  <p class="bytes">{fmtBytes(snapshot.sentBytes)} / {fmtBytes(snapshot.totalBytes)}</p>
+  <p class="bytes">{formatBytes(snapshot.sentBytes)} / {formatBytes(snapshot.totalBytes)}</p>
 
   {#if snapshot.phase === 'failed' && snapshot.error}
     <p class="error-text">{snapshot.error}</p>
@@ -114,7 +108,7 @@
 
   .bytes {
     color: var(--muted);
-    font-size: 0.85rem;
+    font-size: 13px;
     margin: 6px 0 0;
     font-variant-numeric: tabular-nums;
   }

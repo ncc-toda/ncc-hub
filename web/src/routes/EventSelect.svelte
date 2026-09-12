@@ -1,5 +1,6 @@
 <script lang="ts">
   import { ApiError, resolveEvent } from '../lib/api';
+  import { errMsg } from '../lib/errors';
   import { getEventKeys, removeEventKey, setEventKey } from '../lib/keys';
   import { navigate } from '../lib/router';
 
@@ -38,7 +39,7 @@
       if (err instanceof ApiError && (err.status === 400 || err.status === 401 || err.status === 403)) {
         error = 'イベントIDまたは合言葉が違います';
       } else {
-        error = err instanceof Error ? err.message : 'エラーが発生しました';
+        error = errMsg(err);
       }
       busy = false;
     }
@@ -89,8 +90,9 @@
 <style>
   .select-wrap {
     display: flex;
+    align-items: center;
     justify-content: center;
-    padding-top: 8vh;
+    min-height: calc(100dvh - 300px);
   }
 
   .select-card {

@@ -10,6 +10,8 @@
     type EventRecord,
     type WorkRecord,
   } from '../lib/api';
+  import { errMsg } from '../lib/errors';
+  import { formatDate } from '../lib/format';
   import { getEditKey } from '../lib/keys';
   import { renderMarkdown } from '../lib/markdown';
   import { onLinkClick } from '../lib/router';
@@ -20,6 +22,7 @@
   let liked = $state(false);
   let loading = $state(true);
   let error = $state('');
+  let notFound = $state(false);
   let lightboxIndex = $state(-1);
   let destroyed = false;
   let refetchTimer: ReturnType<typeof setTimeout> | null = null;
@@ -50,12 +53,11 @@
         reauth();
         return;
       }
-      error =
-        err instanceof ApiError && err.status === 404
-          ? '作品が見つかりませんでした。削除された可能性があります。'
-          : err instanceof Error
-            ? err.message
-            : 'エラーが発生しました';
+      if (err instanceof ApiError && err.status === 404) {
+        notFound = true;
+      } else {
+        error = errMsg(err);
+      }
     }
     loading = false;
   }
@@ -108,6 +110,15 @@
 
     {#if loading}
       <p class="status-msg">読み込み中…</p>
+    {:else if notFound}
+      <div class="stage-center">
+        <div class="empty">
+          <p class="status-msg">作品が見つかりませんでした。削除された可能性があります。</p>
+          <p class="empty-action">
+            <a href={`/e/${slug}`} onclick={onLinkClick}>← 作品一覧へ</a>
+          </p>
+        </div>
+      </div>
     {:else if error}
       <div class="error-box"><p>{error}</p></div>
     {:else if work}
@@ -115,7 +126,7 @@
         <header class="work-head">
           <div class="head-text">
             <h1>{work.title}</h1>
-            <p class="posted">投稿日：{new Date(work.created).toLocaleDateString('ja-JP')}</p>
+            <p class="posted">投稿日：{formatDate(work.created)}</p>
           </div>
           {#if hasEditKey}
             <a class="btn btn-sm" href={`/e/${slug}/w/${work.id}/edit`} onclick={onLinkClick}>編集</a>
@@ -137,9 +148,7 @@
           <div class="error-box">
             <p>{work.video_error || '動画を変換できませんでした。'}</p>
           </div>
-        {/if}
-
-        {#if ytId}
+        {:else if ytId}
           <div class="yt-wrap">
             <iframe
               src={`https://www.youtube-nocookie.com/embed/${ytId}`}
@@ -188,7 +197,7 @@
         {#if work.tags.length > 0}
           <div class="tags">
             {#each work.tags as tag (tag)}
-              <span class="badge tag">{tag}</span>
+              <span class="chip">{tag}</span>
             {/each}
           </div>
         {/if}
@@ -216,7 +225,7 @@
 
 <style>
   /*
-   * 読み幅を 720px に制限し、縦方向はセクション間 32px / 関連要素間 8-16px のリズムで組む
+   * 読み幅を 720px に制限し、縦方向はセクション間 24px / 関連要素間 8-16px のリズムで組む
    */
   article {
     max-width: 720px;
@@ -248,11 +257,13 @@
   .posted {
     margin: 4px 0 0;
     color: var(--muted);
-    font-size: 0.85rem;
+    font-size: 13px;
   }
 
   video {
     width: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: contain;
     border-radius: var(--radius);
     background: #000;
     margin: 0 0 24px;
@@ -298,34 +309,34 @@
   }
 
   .description {
-    margin: 32px 0;
+    margin: 24px 0;
   }
 
   .demo {
-    margin: 32px 0;
+    margin: 24px 0;
   }
 
-  /* タグは囲みを使わず太字テキストで示す */
   .tags {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px 20px;
-    margin: 32px 0 0;
-  }
-
-  .tag {
-    border: none;
-    background: none;
-    padding: 0;
-    font-size: 0.9rem;
-    font-weight: 700;
-  }
-
-  .tag::before {
-    content: '#';
+    gap: 8px;
+    margin: 24px 0 0;
   }
 
   .like-area {
-    margin: 32px 0 0;
+    margin: 24px 0 0;
+  }
+
+  .empty {
+    text-align: center;
+  }
+
+  .empty .status-msg {
+    padding: 0 16px 8px;
+  }
+
+  .empty-action {
+    margin: 0;
+    font-size: 0.9rem;
   }
 </style>

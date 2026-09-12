@@ -1,5 +1,6 @@
 <script lang="ts">
   import { ApiError, resolveEvent, type EventRecord } from '../lib/api';
+  import { errMsg } from '../lib/errors';
   import { removeEventKey, setEventKey } from '../lib/keys';
 
   let {
@@ -32,7 +33,7 @@
       if (err instanceof ApiError && (err.status === 400 || err.status === 401 || err.status === 403)) {
         error = '合言葉が違います';
       } else {
-        error = err instanceof Error ? err.message : 'エラーが発生しました';
+        error = errMsg(err);
       }
     }
     busy = false;

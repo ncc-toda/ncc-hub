@@ -132,7 +132,7 @@
     align-items: baseline;
     gap: 4px;
     color: var(--muted);
-    font-size: 0.85rem;
+    font-size: 13px;
     flex-shrink: 0;
   }
 

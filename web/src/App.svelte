@@ -23,8 +23,15 @@
 
 <header class="topbar">
   <div class="topbar-inner">
-    <a class="brand" href={homeHref} onclick={onLinkClick}>作品ひろば</a>
-    <a class="keys-link" href="/keys" onclick={onLinkClick}>編集キーを管理</a>
+    <div class="brand-area">
+      <a class="brand" href={homeHref} onclick={onLinkClick}>作品ひろば</a>
+      {#if route.params.slug}
+        <span class="crumb">/ {route.params.slug}</span>
+      {/if}
+    </div>
+    <a class="keys-link" class:active={path === '/keys'} href="/keys" onclick={onLinkClick}
+      >編集キーを管理</a
+    >
   </div>
 </header>
 
@@ -43,13 +50,22 @@
     {:else if route.name === 'edit'}
       <WorkForm slug={route.params.slug} id={route.params.id} />
     {:else}
-      <div class="notfound">
-        <h1>ページが見つかりません</h1>
-        <a class="btn" href="/" onclick={onLinkClick}>トップへ戻る</a>
+      <div class="stage-center">
+        <div class="notfound">
+          <h1>ページが見つかりません</h1>
+          <p class="meta">URLが間違っているか、ページが移動した可能性があります。</p>
+          <a class="btn" href="/" onclick={onLinkClick}>トップへ戻る</a>
+        </div>
       </div>
     {/if}
   {/key}
 </main>
+
+<footer class="footer">
+  <div class="footer-inner">
+    <span class="meta">NccHub</span>
+  </div>
+</footer>
 
 <style>
   .topbar {
@@ -71,6 +87,13 @@
     justify-content: space-between;
   }
 
+  .brand-area {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    min-width: 0;
+  }
+
   .brand {
     font-weight: 800;
     font-size: 1.05rem;
@@ -82,10 +105,44 @@
     text-decoration: none;
   }
 
+  .crumb {
+    color: var(--muted);
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  @media (max-width: 420px) {
+    .crumb {
+      display: none;
+    }
+  }
+
   .keys-link {
     font-size: 0.85rem;
     font-weight: 700;
+    color: var(--muted);
+  }
+
+  .keys-link:hover {
     color: var(--text);
+  }
+
+  .keys-link.active {
+    color: var(--text);
+    text-decoration: underline;
+    text-underline-offset: 4px;
+  }
+
+  .footer {
+    border-top: 0.5px solid var(--border-soft);
+  }
+
+  .footer-inner {
+    max-width: 1060px;
+    margin: 0 auto;
+    padding: 20px 20px 28px;
   }
 
   .notfound {
@@ -95,5 +152,9 @@
 
   .notfound h1 {
     font-size: 1.2rem;
+  }
+
+  .notfound .meta {
+    margin: 12px 0 24px;
   }
 </style>

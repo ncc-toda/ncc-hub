@@ -23,6 +23,7 @@ import {
   type WorkRecord,
 } from './api';
 import { removeUpload, setUpload, type StoredUpload } from './keys';
+import { AppError } from './errors';
 
 export const CHUNK_SIZE = 20_971_520; // 20MB 固定（サーバーはこれ以外を 400 で拒否）
 export const VIDEO_EXTS = ['mp4', 'mov', 'm4v', 'webm', 'mkv', 'avi'];
@@ -368,7 +369,7 @@ export async function pollVideoStatus(
       if (work.video_status !== 'processing' && work.video_status !== 'uploading') return work;
     }
     if (Date.now() > deadline) {
-      throw new Error('変換に時間がかかっています。しばらくしてから作品ページを確認してください');
+      throw new AppError('変換に時間がかかっています。しばらくしてから作品ページを確認してください');
     }
     await sleep(interval);
   }

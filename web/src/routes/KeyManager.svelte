@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { copyText } from '../lib/clipboard';
   import {
     getEditKeys,
     getEventKeys,
@@ -14,6 +15,7 @@
   let newKey = $state('');
   let addError = $state('');
   let copiedId = $state('');
+  let copyFailedId = $state('');
 
   function refresh() {
     editKeys = getEditKeys();
@@ -48,12 +50,13 @@
   }
 
   async function copy(workId: string, key: string) {
-    try {
-      await navigator.clipboard.writeText(key);
+    copyFailedId = '';
+    if (await copyText(key)) {
       copiedId = workId;
       setTimeout(() => (copiedId = ''), 2000);
-    } catch {
-      addError = 'コピーできませんでした';
+    } else {
+      copyFailedId = workId;
+      setTimeout(() => (copyFailedId = ''), 2000);
     }
   }
 
@@ -75,12 +78,16 @@
       {#each editEntries as [workId, key] (workId)}
         <li>
           <div class="key-info">
-            <span class="work-id">作品ID: {workId}</span>
+            <span class="work-id">作品ID：{workId}</span>
             <code>{key}</code>
           </div>
           <div class="key-actions">
             <button type="button" class="btn btn-sm" onclick={() => copy(workId, key)}>
-              {copiedId === workId ? 'コピーしました' : 'コピー'}
+              {copiedId === workId
+                ? 'コピーしました'
+                : copyFailedId === workId
+                  ? 'コピーできません'
+                  : 'コピー'}
             </button>
             <button type="button" class="btn btn-sm btn-danger" onclick={() => onRemoveEditKey(workId)}>
               削除
@@ -112,7 +119,7 @@
       {#each eventEntries as [slug] (slug)}
         <li>
           <div class="key-info">
-            <span class="work-id">イベント: {slug}</span>
+            <span class="work-id">イベント：{slug}</span>
             <code>••••••••</code>
           </div>
           <div class="key-actions">
@@ -171,7 +178,7 @@
   }
 
   .work-id {
-    font-size: 0.8rem;
+    font-size: 13px;
     color: var(--muted);
   }
 

@@ -7,6 +7,8 @@
  * - 送信ファイル名は固定名（サーバー側でさらに乱数名になる）
  */
 
+import { AppError } from './errors';
+
 const MAX_LONG_EDGE = 2048;
 const JPEG_QUALITY = 0.85;
 
@@ -33,7 +35,7 @@ export async function processImage(file: File, seq = 0): Promise<File> {
   try {
     bitmap = await createImageBitmap(file);
   } catch {
-    throw new Error('画像を読み込めませんでした。別の画像をお試しください');
+    throw new AppError('画像を読み込めませんでした。別の画像をお試しください');
   }
 
   try {
@@ -45,7 +47,7 @@ export async function processImage(file: File, seq = 0): Promise<File> {
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('画像を処理できませんでした');
+    if (!ctx) throw new AppError('画像を処理できませんでした');
     ctx.drawImage(bitmap, 0, 0, width, height);
 
     // JPEG 由来は透過を持たないので走査を省略
@@ -57,7 +59,7 @@ export async function processImage(file: File, seq = 0): Promise<File> {
     const blob = await new Promise<Blob | null>((resolve) =>
       canvas.toBlob(resolve, type, alpha ? undefined : JPEG_QUALITY),
     );
-    if (!blob) throw new Error('画像を変換できませんでした');
+    if (!blob) throw new AppError('画像を変換できませんでした');
     return new File([blob], `image_${seq}.${ext}`, { type });
   } finally {
     bitmap.close();

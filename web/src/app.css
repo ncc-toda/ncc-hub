@@ -37,7 +37,7 @@
     --surface-2: #222220;
     --text: #f5f5f3;
     --muted: #b0aca6;
-    --border: #f5f5f3;
+    --border: #c9c7c2;
     --border-soft: #3b3a37;
     --accent: #3794ff;
     --accent-strong: #5ea6fa;
@@ -95,8 +95,16 @@ h1,
 h2,
 h3 {
   line-height: 1.4;
-  font-weight: 800;
   letter-spacing: 0.01em;
+}
+
+h1 {
+  font-weight: 800;
+}
+
+h2,
+h3 {
+  font-weight: 700;
 }
 
 :focus-visible {
@@ -104,7 +112,7 @@ h3 {
   outline-offset: 2px;
 }
 
-input,
+:where(input:not([type='radio'], [type='checkbox'], [type='file'], [type='range'])),
 textarea,
 select {
   font: inherit;
@@ -116,11 +124,17 @@ select {
   width: 100%;
 }
 
-input:focus-visible,
+:where(input:not([type='radio'], [type='checkbox'], [type='file'], [type='range'])):focus-visible,
 textarea:focus-visible,
 select:focus-visible {
   outline: none;
   border: 1.5px solid var(--accent);
+}
+
+input[type='radio'],
+input[type='checkbox'] {
+  accent-color: var(--accent);
+  width: auto;
 }
 
 input::placeholder,
@@ -136,10 +150,21 @@ button {
   font: inherit;
 }
 
+#app {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
 .container {
   max-width: 1060px;
   margin: 0 auto;
   padding: 32px 20px 64px;
+}
+
+main.container {
+  flex: 1;
+  width: 100%;
 }
 
 .card {
@@ -261,6 +286,28 @@ button {
   color: var(--muted);
   text-align: center;
   padding: 48px 16px;
+}
+
+.meta {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.chip {
+  display: inline-block;
+  padding: 3px 10px;
+  border: 0.5px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  color: var(--muted);
+  background: none;
+}
+
+.stage-center {
+  min-height: calc(100dvh - 300px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .markdown-body :is(h1, h2, h3, h4, h5, h6) {

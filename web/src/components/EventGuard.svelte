@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import { ApiError, resolveEvent, type EventRecord } from '../lib/api';
+  import { errMsg } from '../lib/errors';
   import { getEventKey } from '../lib/keys';
   import PassphraseGate from './PassphraseGate.svelte';
 
@@ -47,7 +48,7 @@
       if (err instanceof ApiError && (err.status === 400 || err.status === 401 || err.status === 403)) {
         needKey = true;
       } else {
-        errorMessage = err instanceof Error ? err.message : 'エラーが発生しました';
+        errorMessage = errMsg(err);
       }
       loading = false;
     }

@@ -8,6 +8,7 @@
     type EventRecord,
     type WorkRecord,
   } from '../lib/api';
+  import { errMsg } from '../lib/errors';
   import { renderMarkdown } from '../lib/markdown';
   import { onLinkClick } from '../lib/router';
 
@@ -46,7 +47,7 @@
         reauth();
         return;
       }
-      error = err instanceof Error ? err.message : 'エラーが発生しました';
+      error = errMsg(err);
     }
     loading = false;
   }
@@ -80,10 +81,22 @@
         aria-label="タイトルで検索"
       />
       <nav class="sort" aria-label="並び替え">
-        <button type="button" class="sort-btn" class:active={sortBy === 'new'} onclick={() => (sortBy = 'new')}>
+        <button
+          type="button"
+          class="sort-btn"
+          class:active={sortBy === 'new'}
+          aria-pressed={sortBy === 'new'}
+          onclick={() => (sortBy = 'new')}
+        >
           新着順
         </button>
-        <button type="button" class="sort-btn" class:active={sortBy === 'likes'} onclick={() => (sortBy = 'likes')}>
+        <button
+          type="button"
+          class="sort-btn"
+          class:active={sortBy === 'likes'}
+          aria-pressed={sortBy === 'likes'}
+          onclick={() => (sortBy = 'likes')}
+        >
           いいね順
         </button>
       </nav>
@@ -99,9 +112,18 @@
         </button>
       </div>
     {:else if filtered.length === 0}
-      <p class="status-msg">
-        {works.length === 0 ? 'まだ作品がありません。最初の投稿をしてみましょう。' : '一致する作品がありません。'}
-      </p>
+      <div class="empty">
+        {#if works.length === 0}
+          <p class="status-msg">まだ作品がありません。</p>
+          {#if event.submissions_open}
+            <p class="empty-action">
+              <a href={`/e/${slug}/new`} onclick={onLinkClick}>最初の作品を投稿する</a>
+            </p>
+          {/if}
+        {:else}
+          <p class="status-msg">一致する作品がありません。</p>
+        {/if}
+      </div>
     {:else}
       <div class="grid">
         {#each filtered as work (work.id)}
@@ -115,8 +137,8 @@
 <style>
   /*
    * 余白の設計(8pxスケール):
-   *   見出しブロック → コントロール行: 32px / コントロール行 → グリッド: 24px
-   *   カード間: 24px。検索とソートは同じ 44px の高さラインに揃える
+   *   見出しブロック → コントロール行: 40px / コントロール行 → グリッド: 24px
+   *   カード間: 24px。検索とソートは同じ高さラインに揃える
    */
   .head-row {
     display: flex;
@@ -147,6 +169,7 @@
   .event-desc {
     margin-top: 8px;
     font-size: 0.95rem;
+    max-width: 640px;
   }
 
   .event-desc :global(p) {
@@ -157,7 +180,7 @@
     display: flex;
     align-items: center;
     gap: 24px;
-    margin: 32px 0 24px;
+    margin: 40px 0 24px;
   }
 
   .controls .search {
@@ -167,24 +190,32 @@
   }
 
   .sort {
-    display: flex;
-    gap: 20px;
+    display: inline-flex;
+    border: var(--hairline);
+    border-radius: var(--radius);
+    overflow: hidden;
     margin-left: auto;
   }
 
   .sort-btn {
-    background: none;
+    background: var(--surface);
     border: none;
-    padding: 0;
-    font-size: 0.9rem;
+    padding: 0 18px;
+    min-height: 42px;
+    font-size: 0.85rem;
     font-weight: 400;
     color: var(--muted);
     cursor: pointer;
   }
 
+  .sort-btn + .sort-btn {
+    border-left: var(--hairline);
+  }
+
   .sort-btn.active {
+    background: var(--text);
+    color: var(--bg);
     font-weight: 700;
-    color: var(--text);
   }
 
   .grid {
@@ -228,6 +259,21 @@
 
     .sort {
       margin-left: 0;
+      align-self: flex-start;
     }
+  }
+
+  .empty {
+    text-align: center;
+    padding: 64px 16px;
+  }
+
+  .empty .status-msg {
+    padding: 0 0 8px;
+  }
+
+  .empty-action {
+    margin: 0;
+    font-size: 0.9rem;
   }
 </style>

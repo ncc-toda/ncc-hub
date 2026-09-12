@@ -1,5 +1,6 @@
 <script lang="ts">
   import { ApiError, toggleLike } from '../lib/api';
+  import { errMsg } from '../lib/errors';
 
   let {
     slug,
@@ -29,7 +30,7 @@
       if (err instanceof ApiError && err.status === 423) {
         error = '受付は終了しました';
       } else {
-        error = err instanceof Error ? err.message : 'いいねできませんでした';
+        error = errMsg(err, 'いいねできませんでした');
       }
     }
     busy = false;

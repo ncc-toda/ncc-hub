@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from 'svelte';
   import EventGuard from '../components/EventGuard.svelte';
   import UploadProgress from '../components/UploadProgress.svelte';
   import {
@@ -12,6 +13,9 @@
     type EventRecord,
     type WorkRecord,
   } from '../lib/api';
+  import { copyText } from '../lib/clipboard';
+  import { errMsg } from '../lib/errors';
+  import { formatGB } from '../lib/format';
   import { IMAGE_ACCEPT, processImage } from '../lib/image';
   import {
     getEditKey,
@@ -82,6 +86,7 @@
   let workId = $state(id);
   let createdKey = $state('');
   let copied = $state(false);
+  let copyFailed = $state(false);
 
   let uploader: VideoUploader | null = null;
   let uploadSnap = $state<UploadSnapshot>({ phase: 'idle', sentBytes: 0, totalBytes: 0, error: '' });
@@ -96,10 +101,6 @@
       destroyed = true;
     };
   });
-
-  function errMsg(err: unknown): string {
-    return err instanceof Error && err.message ? err.message : 'エラーが発生しました';
-  }
 
   function onReady(ev: EventRecord) {
     event = ev;
@@ -214,8 +215,7 @@
         return;
       }
       if (event && f.size > event.max_video_bytes) {
-        const gb = (event.max_video_bytes / 1024 ** 3).toFixed(1);
-        fieldErrors['video'] = `動画は最大 ${gb}GB までです`;
+        fieldErrors['video'] = `動画は最大 ${formatGB(event.max_video_bytes)} までです`;
         input.value = '';
         return;
       }
@@ -256,8 +256,8 @@
     if (description.length > 10000) fieldErrors['description'] = 'アピール文は10,000文字以内です';
 
     const urlOk = (u: string) => !u || /^https?:\/\//.test(u);
-    // ファイルモード時、編集では既存の video_url を消さずに保つ
-    const vUrl = videoMode === 'url' ? videoUrl.trim() : (work?.video_url ?? '');
+    // 動画は「どちらか一方」: ファイルモードでは外部URLを持ち越さない
+    const vUrl = videoMode === 'url' ? videoUrl.trim() : '';
     if (!urlOk(vUrl)) fieldErrors['video_url'] = 'http:// または https:// のURLを入力してください';
     const dUrl = demoUrl.trim();
     if (!urlOk(dUrl)) fieldErrors['demo_url'] = 'http:// または https:// のURLを入力してください';
@@ -271,7 +271,8 @@
     if (activeImageCount > 10) fieldErrors['images'] = '画像は10枚までです';
 
     if (tags === null || Object.keys(fieldErrors).some((k) => fieldErrors[k])) {
-      formError = '入力内容を確認してください';
+      // 項目別エラーが出ているときは下部バナーを重ねない
+      formError = '';
       return null;
     }
 
@@ -298,11 +299,20 @@
     return fd;
   }
 
+  /** 最初の項目エラーまでスクロールする（描画後に呼ぶ） */
+  async function focusFirstError() {
+    await tick();
+    document
+      .querySelector('.main-form .error-text')
+      ?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }
+
   function handleSubmitError(err: unknown) {
     if (err instanceof ApiError) {
       if (err.status === 422 && Object.keys(err.fields).length > 0) {
         for (const [k, v] of Object.entries(err.fields)) fieldErrors[k] = String(v);
-        formError = err.message;
+        formError = '';
+        void focusFirstError();
         return;
       }
       if (err.status === 403) {
@@ -320,8 +330,12 @@
 
   async function submit(e: SubmitEvent) {
     e.preventDefault();
+    if (submitting) return;
     const fd = validate();
-    if (!fd || submitting) return;
+    if (!fd) {
+      void focusFirstError();
+      return;
+    }
     submitting = true;
     try {
       if (isEdit) {
@@ -366,12 +380,12 @@
   }
 
   async function copyKey() {
-    try {
-      await navigator.clipboard.writeText(createdKey);
+    copyFailed = false;
+    if (await copyText(createdKey)) {
       copied = true;
       setTimeout(() => (copied = false), 2000);
-    } catch {
-      formError = 'コピーできませんでした。手動で控えてください';
+    } else {
+      copyFailed = true;
     }
   }
 
@@ -484,22 +498,24 @@
     {#if step === 'loading'}
       <p class="status-msg">読み込み中…</p>
     {:else if step === 'needkey'}
-      <form class="card key-form" onsubmit={submitEditKey}>
-        <h1>編集キーの入力</h1>
-        <p class="hint">
-          この作品を編集するには、投稿時に表示された編集キーが必要です。忘れた場合は先生に聞いてください。
-        </p>
-        <input
-          type="text"
-          bind:value={editKeyInput}
-          placeholder="編集キー"
-          autocomplete="off"
-          autocapitalize="off"
-          spellcheck="false"
-        />
-        {#if keyError}<p class="error-text">{keyError}</p>{/if}
-        <button type="submit" class="btn btn-primary">続ける</button>
-      </form>
+      <div class="stage-center">
+        <form class="card key-form" onsubmit={submitEditKey}>
+          <h1>編集キーの入力</h1>
+          <p class="hint">
+            この作品を編集するには、投稿時に表示された編集キーが必要です。忘れた場合は先生に聞いてください。
+          </p>
+          <input
+            type="text"
+            bind:value={editKeyInput}
+            placeholder="編集キー"
+            autocomplete="off"
+            autocapitalize="off"
+            spellcheck="false"
+          />
+          {#if keyError}<p class="error-text">{keyError}</p>{/if}
+          <button type="submit" class="btn btn-primary">続ける</button>
+        </form>
+      </div>
     {:else if step === 'form'}
       {#if loadError}
         <div class="error-box"><p>{loadError}</p></div>
@@ -642,15 +658,21 @@
                   </button>
                 </div>
               {/if}
-              <input
-                type="file"
-                accept="video/*,.mov,.mkv,.avi,.m4v"
-                onchange={onVideoPick}
-                disabled={!!pendingResume}
-              />
+              <div class="video-pick">
+                <label class="btn btn-sm" class:disabled={!!pendingResume}>
+                  動画を選ぶ
+                  <input
+                    type="file"
+                    accept="video/*,.mov,.mkv,.avi,.m4v"
+                    hidden
+                    onchange={onVideoPick}
+                    disabled={!!pendingResume}
+                  />
+                </label>
+              </div>
               {#if event}
                 <p class="hint">
-                  最大 {(event.max_video_bytes / 1024 ** 3).toFixed(1)}GB。{isEdit
+                  最大 {formatGB(event.max_video_bytes)}。{isEdit
                     ? '保存後にアップロードが始まります。'
                     : '投稿の保存が終わってからアップロードが始まります。'}
                 </p>
@@ -727,6 +749,7 @@
         </form>
       {/if}
     {:else if step === 'editkey'}
+      <div class="stage-center">
       <div class="card done-card">
         <h1>投稿しました</h1>
         <p>
@@ -738,6 +761,9 @@
             {copied ? 'コピーしました' : 'コピー'}
           </button>
         </div>
+        {#if copyFailed}
+          <p class="error-text">コピーできませんでした。手動で控えてください</p>
+        {/if}
         <p class="warn-text">
           この画面を閉じると再表示できません。先生に聞けば再発行できます。
           （この端末には自動保存されました）
@@ -752,6 +778,7 @@
           </a>
         {/if}
       </div>
+      </div>
     {:else if step === 'upload'}
       <h1>動画のアップロード</h1>
       <UploadProgress
@@ -765,6 +792,7 @@
         onRetry={retryUpload}
       />
     {:else if step === 'processing'}
+      <div class="stage-center">
       <div class="card done-card">
         {#if processingResult === 'processing'}
           <h1>変換中</h1>
@@ -789,6 +817,7 @@
           作品ページを見る
         </a>
       </div>
+      </div>
     {/if}
   {/snippet}
 </EventGuard>
@@ -809,6 +838,7 @@
   }
 
   .key-form {
+    width: 100%;
     max-width: 480px;
     padding: 24px;
     display: flex;
@@ -914,11 +944,13 @@
   .radio {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
+    font-size: 0.95rem;
   }
 
-  .radio input {
-    width: auto;
+  .btn.disabled {
+    opacity: 0.45;
+    pointer-events: none;
   }
 
   .current-video {
@@ -929,12 +961,13 @@
     border: var(--hairline);
     border-radius: var(--radius);
     background: var(--surface);
-    padding: 16px 20px 4px;
+    padding: 20px 20px 8px;
     margin: 40px 0 0;
   }
 
   .author-box legend {
-    font-weight: 800;
+    font-weight: 700;
+    font-size: 0.95rem;
     padding: 0 8px;
   }
 
@@ -944,7 +977,6 @@
     border-radius: var(--radius-sm);
     padding: 8px 12px;
     font-size: 0.9rem;
-    font-weight: 700;
     margin: 0 0 20px;
   }
 
@@ -961,6 +993,7 @@
   }
 
   .done-card {
+    width: 100%;
     max-width: 560px;
     margin: 0 auto;
     padding: 28px 24px;
