@@ -30,37 +30,33 @@ ffmpeg と exiftool は Nix のビルド成果物に同梱されるため、`apt
 
 学内サーバーの外部公開が学校の方針上問題ないかは、着手前に確認してください。
 
-## 3. 公開ドメインの用意
+## 3. 公開ドメイン
 
-Cloudflare の無料プランでは **サブドメイン単独の zone を作れません**。
-subdomain setup は Enterprise 限定、partial（CNAME）setup は Business 以上です。
-したがって現実的な経路は次の 2 つに限られます。
+公開ホスト名は **`ncchub.ncc-system.jp`** です。
+zone `ncc-system.jp` は既に Cloudflare 管理下にあるため、**ネームサーバーの移管作業は不要**です。
 
-### 経路 A: 学校ドメイン全体を Cloudflare へ NS 委任する
+ただし zone は他用途と共有しています。次の 3 点に注意してください。
 
-学校の既存 zone をまるごと Cloudflare に移します。
-MX、SPF、DKIM、既存 Web の A / CNAME をすべて移行する必要があり、
-**移行ミスは学校のメールを止めます**。
-情報システム管理者の承認と作業窓口が必須です。
+### 3.1 既存の MX と SPF を消さない
 
-### 経路 B: 独自ドメインを 1 つ新規取得する（推奨）
+メールは別サーバー（ValueServer）で受けています。
+DNS タブで既存の MX / TXT(SPF) レコードに触れないでください。
 
-年額数百〜数千円で取得し、ネームサーバーを Cloudflare に向けます。
-学校の既存 DNS には一切触りません。
-校内ハッカソンという用途に対して、経路 A のリスクは釣り合いません。
+### 3.2 ワイルドカードレコードがある
 
-### 検証用: Quick Tunnel
+`*.ncc-system.jp` が Cloudflare プロキシ経由で存在します。
+そのため `ncchub.ncc-system.jp` は設定前から名前解決でき、現在は 502 を返します。これは正常です。
 
-ドメインを用意する前に動作確認だけしたい場合は、
-`--skip-tunnel` で install.sh を通してから手動でクイックトンネルを起動します。
+Tunnel の Public Hostname を設定すると `ncchub` の明示 CNAME が作られ、ワイルドカードより優先されます。
+設定後に DNS タブで `ncchub` が明示レコードとして存在することを確認してください。
 
-```bash
-cloudflared tunnel --url http://127.0.0.1:8090
-```
+### 3.3 zone 全体に効く設定を入れない
 
-`*.trycloudflare.com` のランダムな URL が発行されます。
-再起動のたびに URL が変わり、**Cloudflare Access も WAF も掛けられません**。
-管理画面がパスワードだけで外部公開される状態になるため、本番運用には使わないでください。
+WAF のレートリミットは無料プランで 1 本だけです。
+`http.host` で対象ホストを限定しないと、同じ zone の別サイトにも掛かります（§6.3）。
+
+Cloudflare Access についても、既存のアプリケーションに `*.ncc-system.jp` のような
+ワイルドカードが無いか確認してください。あると生徒がアクセスできなくなります。
 
 ## 4. Cloudflare Tunnel の作成（ダッシュボード側）
 
@@ -88,6 +84,7 @@ curl -fsSL https://raw.githubusercontent.com/ncc-toda/ncc-hub/main/deploy/instal
 sudo bash install.sh \
   --admin-email <先生のメールアドレス> \
   --generate-admin-password \
+  --hostname ncchub.ncc-system.jp \
   --tunnel-token-file /root/tunnel-token.txt \
   --event-name '文化祭くじ引きアプリ ハッカソン 2026' \
   --event-slug fes2026 \
@@ -107,6 +104,7 @@ sudo bash install.sh \
 | `--force-admin-password` | 既存管理者のパスワードを上書きする |
 | `--tunnel-token-file PATH` | Tunnel token をファイルから読む（推奨） |
 | `--tunnel-protocol http2` | UDP/7844 が塞がれている環境で使う |
+| `--hostname HOST` | 公開ホスト名。末尾のチェックリストに埋め込む（動作には影響しない） |
 | `--skip-tunnel` | トンネル設定を行わない |
 | `--event-slug SLUG` | 初期イベントを投入する（合言葉の指定も必要） |
 | `--dry-run` | 実行せず計画のみ表示する |
@@ -166,17 +164,20 @@ Zero Trust → Networks → Tunnels → 該当トンネル → Public Hostname�
 
 書き込み API への乱打を防ぎます。Security → WAF → Rate limiting rules。
 
-- 条件: `(http.request.method eq "POST" and http.request.uri.path contains "/api/")`
+- 条件: `(http.host eq "ncchub.ncc-system.jp" and http.request.method eq "POST" and http.request.uri.path contains "/api/")`
 - 制限: 60 リクエスト / 1 分
 - 動作: Block
+
+`http.host` の条件を必ず入れてください。zone を他用途と共有しているため、
+外すと同じ zone の別サイトにも同じ制限が掛かります。
 
 ### 6.4 Cloudflare Access（管理画面の保護）
 
 Zero Trust → Access → Applications → Add an application → Self-hosted。
 以下の 2 パスをそれぞれ保護対象にします。
 
-- `<公開ホスト名>/_/*`
-- `<公開ホスト名>/api/collections/_superusers/*`
+- `ncchub.ncc-system.jp/_/*`
+- `ncchub.ncc-system.jp/api/collections/_superusers/*`
 
 ポリシーは「Include: Emails に教員のメールアドレス」「認証方式は One-time PIN」。
 
@@ -186,7 +187,7 @@ Zero Trust → Access → Applications → Add an application → Self-hosted。
 ### 6.5 疎通確認
 
 ```bash
-curl -sI https://<公開ホスト名>/api/health
+curl -sI https://ncchub.ncc-system.jp/api/health
 ```
 
 200 が返れば公開完了です。
@@ -375,7 +376,7 @@ root で実行すると `pb_data` に root 所有のファイルができ、以�
 ```bash
 cloudflared tunnel login
 cloudflared tunnel create works
-cloudflared tunnel route dns works works.example.jp
+cloudflared tunnel route dns works ncchub.ncc-system.jp
 ```
 
 `cloudflared tunnel create` は credentials を `~/.cloudflared/<TUNNEL_ID>.json` に書きます。
@@ -392,7 +393,7 @@ sudo install -m 0600 ~/.cloudflared/<TUNNEL_ID>.json /etc/cloudflared/
 tunnel: <TUNNEL_ID>
 credentials-file: /etc/cloudflared/<TUNNEL_ID>.json
 ingress:
-  - hostname: works.example.jp
+  - hostname: ncchub.ncc-system.jp
     service: http://127.0.0.1:8090
   - service: http_status:404
 ```

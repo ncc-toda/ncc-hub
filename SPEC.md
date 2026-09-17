@@ -695,13 +695,17 @@ exiftool -all= -overwrite_original -q <file>...
 
 - 学内サーバー：Linux（Ubuntu / Debian、x86_64 または aarch64）。systemd があること。
 - メモリ 4GB 以上（swap 含む）。`/nix` 側に 20GB、データ側に 10GB 以上の空き。
-- Cloudflare アカウント（無料）と、Cloudflare にネームサーバーを向けた zone 1つ。ホスト名は例として `works.example.jp` とする。
 - 学内サーバーからインターネットへ HTTPS（443）の外向き接続ができること。UDP/7844 が通らない場合は §12.4 の http2 フォールバックを使う。
 
-公開ドメインについて、Cloudflare の無料プランでは **サブドメイン単独の zone を作れない**（subdomain setup は Enterprise 限定、partial/CNAME setup は Business 以上）。したがって取り得る経路は次の2つに限られる。
+公開ホスト名は **`ncchub.ncc-system.jp`** とする。zone `ncc-system.jp` は既に Cloudflare 管理下にあるため、ネームサーバーの移管は不要である。
 
-- **経路A：学校ドメイン全体を Cloudflare へ NS 委任する。** MX、SPF、DKIM、既存 Web のレコードをすべて移すため、移行ミスが学校のメールを止める。情報システム管理者の承認と作業窓口が必須。
-- **経路B：独自ドメインを1つ新規取得して Cloudflare へ委任する。** 学校の既存 DNS に一切触らない。校内ハッカソンという用途に対しては経路Bを推奨する。
+zone は他用途と共有している。以下の3点に注意する。
+
+- **既存の MX と SPF を消さない。** メールは別サーバーで受けている。
+- **`*.ncc-system.jp` のワイルドカードレコードが存在する。** Tunnel の Public Hostname を設定すると `ncchub` の明示レコードが作られ、ワイルドカードより優先される。設定後に DNS タブで明示レコードになっていることを確認する。
+- **zone 全体に効く設定を入れない。** 特に WAF のレートリミットは `http.host` で対象ホストを限定する（§12.4）。無料プランのレートリミットは1本だけなので、他用途と取り合いになる。
+
+Cloudflare の無料プランでは **サブドメイン単独の zone を作れない**（subdomain setup は Enterprise 限定、partial/CNAME setup は Business 以上）。そのため zone は apex 単位で管理する前提になる。
 
 ### 12.2 インストール（`deploy/install.sh`）
 
@@ -789,10 +793,10 @@ sudo /opt/works/src/deploy/update.sh
    作成したトンネルの Public Hostname に公開ホスト名を設定し、Service を `http://127.0.0.1:8090` にする。
 3. **ダッシュボード設定**
    - SSL/TLS：Full
-   - Security → WAF → Rate limiting rules：`(http.request.method eq "POST" and http.request.uri.path contains "/api/")` を 60 req/分 でブロック（無料枠1本）
-   - Zero Trust → Access → Applications：`works.example.jp/_/*` と `works.example.jp/api/collections/_superusers/*` に Self-hosted アプリを作り、ポリシー「メールが `<管理者のメール>` に一致 → Allow（One-time PIN）」。**それ以外のパスには Access を掛けない**（学生には合言葉のみ）
+   - Security → WAF → Rate limiting rules：`(http.host eq "ncchub.ncc-system.jp" and http.request.method eq "POST" and http.request.uri.path contains "/api/")` を 60 req/分 でブロック（無料枠1本）。**`http.host` の条件を必ず入れる**。zone を他用途と共有しているため、外すと同じ zone の別サイトにも掛かる
+   - Zero Trust → Access → Applications：`ncchub.ncc-system.jp/_/*` と `ncchub.ncc-system.jp/api/collections/_superusers/*` に Self-hosted アプリを作り、ポリシー「メールが `<管理者のメール>` に一致 → Allow（One-time PIN）」。**それ以外のパスには Access を掛けない**（学生には合言葉のみ）
    - Caching：既定でよい。`/api/files/*` はキャッシュされても問題ない（乱数名なので更新時はURLが変わる）
-4. **確認**：`curl -sI https://works.example.jp/api/health` が 200。
+4. **確認**：`curl -sI https://ncchub.ncc-system.jp/api/health` が 200。
 5. **UDP が塞がれている場合**：`journalctl -u cloudflared` に `Registered tunnel connection` が出なければ、学内ファイアウォールが QUIC（UDP/7844）を遮断している。install.sh に `--tunnel-protocol http2` を付けて再実行する。
 
 works-server は `127.0.0.1` のみで待ち受けるため、ルーターやファイアウォールで 8090 を開けてはならない。
@@ -810,9 +814,9 @@ works-server は `127.0.0.1` のみで待ち受けるため、ルーターやフ
 
 ## 13. 運用手順（先生向け、README にも転記）
 
-1. 管理画面 `https://works.example.jp/_/` にログイン。
+1. 管理画面 `https://ncchub.ncc-system.jp/_/` にログイン。
 2. `events` に1件作成：`name`「文化祭くじ引きアプリ ハッカソン 2026」、`slug` `fes2026`、`passphrase`（8文字以上、学生に配る）、`max_video_bytes` 2147483648、`submissions_open` true。
-3. 学生に `https://works.example.jp/e/fes2026` と合言葉を配る。
+3. 学生に `https://ncchub.ncc-system.jp/e/fes2026` と合言葉を配る。
 4. 作者を確認したいとき：管理画面 → `work_secrets` → `work` で絞り込む。
 5. 編集キーを忘れた学生には `work_secrets.edit_key` を伝える（本人確認は先生の判断）。
 6. 締切後：`submissions_open` を false にする（閲覧・いいねは継続可。いいねも止めたい場合は仕様上 423 になる）。

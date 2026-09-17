@@ -19,6 +19,7 @@ LISTEN=127.0.0.1:8090
 KEEP_RELEASES=3
 NIX_INSTALL_URL=https://nixos.org/nix/install
 TUNNEL_PROTOCOL=auto
+HOSTNAME_PUBLIC=${WORKS_HOSTNAME:-}
 SECRETS_FILE=/root/ncc-hub-install-secrets.txt
 BACKUP_ENV=/etc/works/backup.env
 BACKUP_EMAIL=backup@ncc-hub.local
@@ -72,6 +73,7 @@ NccHub ワンショットインストーラ（Ubuntu / Debian）
   --tunnel-token-file PATH         Cloudflare Tunnel の token をファイルから読む（推奨）
   --tunnel-token TOKEN             token を直接指定（ps に露出する）
   --tunnel-protocol auto|http2|quic  UDP/7844 が塞がれている環境では http2
+  --hostname HOST                  公開ホスト名。末尾のチェックリストに埋め込む
   --skip-tunnel                    トンネル設定を行わない
   --event-name NAME                初期イベント名
   --event-slug SLUG                初期イベントの slug
@@ -106,6 +108,7 @@ parse_args() {
       --tunnel-token)          TUNNEL_TOKEN=$2; shift 2 ;;
       --tunnel-token-file)     TUNNEL_TOKEN_FILE=$2; shift 2 ;;
       --tunnel-protocol)       TUNNEL_PROTOCOL=$2; shift 2 ;;
+      --hostname)              HOSTNAME_PUBLIC=$2; shift 2 ;;
       --skip-tunnel)           SKIP_TUNNEL=1; shift ;;
       --event-name)            EVENT_NAME=$2; shift 2 ;;
       --event-slug)            EVENT_SLUG=$2; shift 2 ;;
@@ -726,7 +729,7 @@ EOF
 }
 
 print_next_steps() {
-  local host='<公開ホスト名>'
+  local host=${HOSTNAME_PUBLIC:-'<公開ホスト名>'}
   echo
   printf '%s================ インストール完了 ================%s\n' "$C_OK" "$C_0"
   echo
@@ -741,11 +744,13 @@ print_next_steps() {
 === 残っている手作業 ===
 
 [ ] Cloudflare Zero Trust > Networks > Tunnels > 該当トンネル > Public Hostname
-      公開ホスト名を設定し、Service を http://$LISTEN にする
+      $host を設定し、Service を http://$LISTEN にする
 [ ] Cloudflare ダッシュボード > SSL/TLS > 暗号化モードを Full にする
 [ ] Security > WAF > Rate limiting rules を1本追加
-      (http.request.method eq "POST" and http.request.uri.path contains "/api/")
+      (http.host eq "$host" and http.request.method eq "POST"
+       and http.request.uri.path contains "/api/")
       60 req / 1 min → Block
+      ※ zone を他用途と共有している場合、http.host の条件は必須
 [ ] Zero Trust > Access > Applications に Self-hosted を2本
       $host/_/*
       $host/api/collections/_superusers/*

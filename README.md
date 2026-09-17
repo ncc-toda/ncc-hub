@@ -25,6 +25,7 @@
 ```bash
 curl -fsSL https://raw.githubusercontent.com/ncc-toda/ncc-hub/main/deploy/install.sh -o install.sh
 sudo bash install.sh --admin-email <先生のメール> --generate-admin-password \
+                     --hostname ncchub.ncc-system.jp \
                      --tunnel-token-file /root/tunnel-token.txt
 ```
 
