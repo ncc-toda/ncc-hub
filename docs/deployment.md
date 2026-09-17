@@ -140,6 +140,7 @@ sudo bash install.sh \
 | `/etc/works/install.env` | 設置時の設定（秘密情報は含まない） |
 | `/etc/works/backup.env` | バックアップ用の認証情報（0600） |
 | `/etc/works/state/` | インストーラの状態マーカー |
+| `/etc/systemd/system/works-update.*` | 自動更新のタイマー（`--enable-cd` 時のみ） |
 | `/root/ncc-hub-install-secrets.txt` | 自動生成した管理者パスワード（控えたら `shred -u`） |
 
 `/opt/works/releases/<sha>` を Nix の GC ルートにしているのは、
@@ -217,6 +218,65 @@ health が通らなければ **直前のリリースへ自動で戻して再起�
 | `--skip-backup` | 更新前バックアップを取らない |
 | `--no-rollback` | health 失敗時に自動で戻さない |
 | `--dry-run` | 実行せず計画のみ表示 |
+
+## 7.5 自動更新（CD）
+
+学内サーバーは Cloudflare Tunnel の内側にあり、外から接続できません。
+そのため GitHub Actions からサーバーへ push する構成は取れず、**サーバー側から pull する方式**を使います。
+
+```
+push → GitHub Actions (CI) → 通れば release branch を進める
+                                      ↓
+              学内サーバーの systemd timer が10分ごとに追従
+```
+
+`release` branch には **CI が通った commit しか進みません**。
+サーバーが壊れたコードを引くことはありません。
+
+### 7.5.1 有効にする
+
+初回は先に main へ push し、CI を 1 回通して `release` branch を作ってください。
+
+```bash
+sudo /opt/works/src/deploy/install.sh \
+  --skip-clone --skip-tunnel -y \
+  --admin-email <設置時と同じ先生のメール> --generate-admin-password \
+  --enable-cd
+```
+
+`--enable-cd` は追従先を `release` に切り替え、`works-update.timer` を設置して有効化します。
+
+既存の管理者パスワードとデータには触れません。
+`--generate-admin-password` を付けていても、管理者が既にいれば生成した文字列は破棄され、
+末尾にパスワードは表示されません。
+
+### 7.5.2 止める・再開する
+
+**文化祭など、更新を止めたい期間は必ず止めてください。**
+ビルドは CPU を使うため、動画変換の待ち行列と取り合いになります。
+
+```bash
+sudo systemctl disable --now works-update.timer    # 止める
+sudo systemctl enable --now works-update.timer     # 再開する
+```
+
+### 7.5.3 状態を見る
+
+```bash
+systemctl list-timers works-update.timer     # 次回の発火時刻
+journalctl -u works-update -n 50             # 直近の更新ログ
+systemctl show -p Result --value works-update.service
+```
+
+変更が無いときは何もせずに終了します。バックアップもビルドも走りません。
+
+### 7.5.4 失敗したとき
+
+`update.sh` と同じ挙動です。ビルドが失敗すれば稼働中のリリースはそのまま、
+切り替え後に health が通らなければ直前のリリースへ自動で戻ります。
+
+失敗は journal に残るだけで通知は飛びません。
+自動更新を有効にしている期間は、週に一度 `journalctl -u works-update` を確認してください。
 
 ## 8. バックアップとリストア
 

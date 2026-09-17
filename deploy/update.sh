@@ -106,11 +106,30 @@ prune_releases() {
             | sort -rn | cut -d' ' -f2-)
 }
 
+# install.sh を経ずに手で clone した場合に備える。systemd 配下でも読める --system に入れる。
+git config --system --get-all safe.directory 2>/dev/null | grep -qx "$SRC_DIR" \
+  || git config --system --add safe.directory "$SRC_DIR" 2>/dev/null || true
+
 PREV_TARGET=$(readlink "$PREFIX/current" 2>/dev/null || true)
 CUR_SHA=$(basename "${PREV_TARGET:-}" 2>/dev/null || true)
 
 info "更新前の確認"
 ok "現在のリリース: ${CUR_SHA:-なし}"
+
+# 先に fetch して差分の有無だけを見る。バックアップとビルドはその後。
+# タイマーから定期実行する（CD）ため、変更が無いときは何もしないで抜けることが重要。
+info "ソースを確認: $REF"
+run git -C "$SRC_DIR" fetch --prune origin "$REF"
+
+if [ "$DRY_RUN" = 1 ]; then
+  printf '  [dry-run] 差分があればバックアップ→ビルド→切替を実行\n'; exit 0
+fi
+
+NEW_SHA=$(git -C "$SRC_DIR" rev-parse --short=12 FETCH_HEAD)
+if [ "$NEW_SHA" = "$CUR_SHA" ] && [ "$FORCE" = 0 ]; then
+  ok "すでに最新です（$NEW_SHA）。--force で再ビルドできます"
+  exit 0
+fi
 
 if [ "$SKIP_BACKUP" = 0 ]; then
   info "更新前バックアップ"
@@ -122,19 +141,7 @@ if [ "$SKIP_BACKUP" = 0 ]; then
   fi
 fi
 
-info "ソースを更新: $REF"
-run git -C "$SRC_DIR" fetch --prune origin "$REF"
 run git -C "$SRC_DIR" reset --hard FETCH_HEAD
-
-if [ "$DRY_RUN" = 1 ]; then
-  printf '  [dry-run] ビルドと切替を実行\n'; exit 0
-fi
-
-NEW_SHA=$(git -C "$SRC_DIR" rev-parse --short=12 HEAD)
-if [ "$NEW_SHA" = "$CUR_SHA" ] && [ "$FORCE" = 0 ]; then
-  ok "すでに最新です（$NEW_SHA）。--force で再ビルドできます"
-  exit 0
-fi
 
 info "ビルド: $NEW_SHA"
 nix_run build "$SRC_DIR#default" -o "$PREFIX/releases/$NEW_SHA" --print-build-logs

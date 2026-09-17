@@ -33,7 +33,7 @@ FORCE_ADMIN_PASSWORD=0
 TUNNEL_TOKEN=${WORKS_TUNNEL_TOKEN:-}
 TUNNEL_TOKEN_FILE=${WORKS_TUNNEL_TOKEN_FILE:-}
 EVENT_NAME=; EVENT_SLUG=; EVENT_PASSPHRASE=; EVENT_PASSPHRASE_FILE=
-SKIP_NIX=0; SKIP_TUNNEL=0; SKIP_CLONE=0
+SKIP_NIX=0; SKIP_TUNNEL=0; SKIP_CLONE=0; ENABLE_CD=0; REF_EXPLICIT=0
 DRY_RUN=0; NON_INTERACTIVE=0; VERBOSE=0
 
 # ---------------------------------------------------------------- 出力
@@ -82,6 +82,7 @@ NccHub ワンショットインストーラ（Ubuntu / Debian）
   --repo URL                       既定 https://github.com/ncc-toda/ncc-hub.git
   --ref REF                        既定 main
   --skip-clone                     既存の $PREFIX/src をそのまま使う
+  --enable-cd                      release branch を10分ごとに追従するタイマーを入れる
   --skip-nix                       Nix の導入を行わない（導入済み前提）
   --nix-install-url URL            Nix インストーラの URL
   --prefix DIR                     既定 /opt/works
@@ -115,8 +116,9 @@ parse_args() {
       --event-passphrase)      EVENT_PASSPHRASE=$2; shift 2 ;;
       --event-passphrase-file) EVENT_PASSPHRASE_FILE=$2; shift 2 ;;
       --repo)                  REPO=$2; shift 2 ;;
-      --ref)                   REF=$2; shift 2 ;;
+      --ref)                   REF=$2; REF_EXPLICIT=1; shift 2 ;;
       --skip-clone)            SKIP_CLONE=1; shift ;;
+      --enable-cd)             ENABLE_CD=1; shift ;;
       --skip-nix)              SKIP_NIX=1; shift ;;
       --nix-install-url)       NIX_INSTALL_URL=$2; shift 2 ;;
       --prefix)                PREFIX=$2; shift 2 ;;
@@ -131,6 +133,8 @@ parse_args() {
       *) die "未知のオプション: $1（--help でヘルプ）" ;;
     esac
   done
+  # --enable-cd は release を追従する。--ref を明示した場合はそちらを優先する。
+  [ "$ENABLE_CD" = 1 ] && [ "$REF_EXPLICIT" = 0 ] && REF=release
   SRC_DIR=$PREFIX/src
   PB_DATA=$DATA_DIR/pb_data
   UNIT=/etc/systemd/system/works-server.service
@@ -391,10 +395,24 @@ sync_source() {
   elif [ -e "$SRC_DIR" ] && [ -n "$(ls -A "$SRC_DIR" 2>/dev/null)" ]; then
     die "$SRC_DIR が git リポジトリでない状態で存在します。退避してから再実行してください"
   else
+    # release branch は CI が最初に main へ push されたときに作られる。
+    # 初回インストールで --enable-cd を付けるとまだ存在しないことがある。
+    if [ "$DRY_RUN" = 0 ] && [ -z "$(git ls-remote --heads "$REPO" "$REF" 2>/dev/null)" ]; then
+      die "$REPO に branch '$REF' がありません。
+  --enable-cd を使う場合は、先に main へ push して CI を1回通し、release branch を作ってください。
+  それまでは --ref main で設置し、あとから --enable-cd で再実行できます。"
+    fi
     info "ソースを取得: $REPO ($REF)"
     run git clone --branch "$REF" "$REPO" "$SRC_DIR"
   fi
-  run git config --global --add safe.directory "$SRC_DIR"
+  # --global は呼び出し元の HOME に書かれ、systemd 配下（HOME 無し）からは読まれない。
+  # タイマーから update.sh を動かすため、システム全体の gitconfig に入れる。
+  if [ "$DRY_RUN" = 0 ]; then
+    git config --system --get-all safe.directory 2>/dev/null | grep -qx "$SRC_DIR" \
+      || git config --system --add safe.directory "$SRC_DIR"
+  else
+    printf '  [dry-run] git config --system --add safe.directory %s\n' "$SRC_DIR"
+  fi
 }
 
 # ---------------------------------------------------------------- ビルドと切替
@@ -415,7 +433,22 @@ build_release() {
   fi
   # releases/<sha> 自体を out-link（= GC ルート）にする。
   # current を直接 out-link にすると、切替時に旧世代の GC ルートが消えてロールバック先を失う。
-  nix_run build "$SRC_DIR#default" -o "$PREFIX/releases/$REL" --print-build-logs
+  #
+  # go mod download は fixed-output derivation の中で走るため nix の再試行が効かない。
+  # proxy.golang.org や cache.nixos.org の一時的な失敗でインストール全体が落ちるのを避けて、
+  # ビルドだけ数回やり直す。恒久的な失敗（vendorHash のずれ等）は結局同じエラーで止まる。
+  local attempt=1 max=3
+  while :; do
+    if nix_run build "$SRC_DIR#default" -o "$PREFIX/releases/$REL" --print-build-logs; then
+      break
+    fi
+    if [ "$attempt" -ge "$max" ]; then
+      die "ビルドに $max 回失敗しました。上のログを確認してください"
+    fi
+    warn "ビルドに失敗しました。${attempt}/${max} 回目 — 15秒後に再試行します"
+    attempt=$((attempt + 1))
+    sleep 15
+  done
   ok "リリース $REL をビルド"
 }
 
@@ -455,6 +488,9 @@ ensure_superuser() {
   local marker="$STATE_DIR/superuser-created"
   if [ "$FORCE_ADMIN_PASSWORD" = 0 ] && [ -f "$marker" ]; then
     ok "管理者は作成済み（パスワードは変更しません）"
+    # 生成したパスワードは使われていない。末尾に表示すると、
+    # 実際には設定されていない文字列を控えさせてしまう。
+    ADMIN_PASSWORD_GENERATED=0
     return 0
   fi
   if [ "$DRY_RUN" = 1 ]; then
@@ -692,6 +728,30 @@ install_tunnel() {
   warn "  ログ: journalctl -u cloudflared -n 50"
 }
 
+# CI が通った commit だけが進む release branch を、タイマーで追従する。
+# 更新の中身（バックアップ・health 検証・ロールバック）は update.sh 側が持つ。
+ensure_cd_timer() {
+  if [ "$ENABLE_CD" = 0 ]; then
+    # 既に入っている場合は、明示的に外すまで残す（再実行で勝手に消さない）。
+    return 0
+  fi
+  info "自動更新タイマー"
+  if [ "$DRY_RUN" = 1 ]; then
+    printf '  [dry-run] works-update.service / .timer を配置して有効化\n'; return 0
+  fi
+  local u
+  for u in works-update.service works-update.timer; do
+    local tmp; tmp=$(mktemp "$WORKDIR/unit.XXXXXX")
+    sed -e "s|/opt/works/src|$SRC_DIR|g" "$SRC_DIR/deploy/$u" > "$tmp"
+    cmp -s "$tmp" "/etc/systemd/system/$u" || install -m 0644 "$tmp" "/etc/systemd/system/$u"
+    rm -f "$tmp"
+  done
+  systemctl daemon-reload
+  systemctl enable --now works-update.timer
+  ok "10分ごとに release branch を追従します"
+  ok "止めるとき: sudo systemctl disable --now works-update.timer"
+}
+
 # ---------------------------------------------------------------- 仕上げ
 write_install_env() {
   [ "$DRY_RUN" = 1 ] && return 0
@@ -773,6 +833,12 @@ EOF
   更新    : sudo $SRC_DIR/deploy/update.sh
   バックアップ: sudo $SRC_DIR/deploy/backup.sh
 EOF
+  if [ "$ENABLE_CD" = 1 ]; then
+    printf '\n自動更新: 有効（release branch を10分ごとに追従）\n'
+    printf '  止める: sudo systemctl disable --now works-update.timer\n'
+    printf '  状態  : systemctl list-timers works-update.timer\n'
+    printf '  ログ  : journalctl -u works-update -n 50\n'
+  fi
   [ "$SKIP_TUNNEL" = 1 ] && printf '\n%s注意:%s トンネルは設定していません。外部からは到達できません。\n' "$C_WARN" "$C_0" || true
   [ "$DRY_RUN" = 1 ]     && printf '\n%s注意:%s dry-run のため何も実行していません。\n' "$C_WARN" "$C_0" || true
 }
@@ -813,6 +879,7 @@ main() {
   seed_event
   ensure_cloudflared
   install_tunnel
+  ensure_cd_timer
   prune_releases
   write_install_env
   save_secrets

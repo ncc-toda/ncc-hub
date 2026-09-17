@@ -1,0 +1,12 @@
+[Unit]
+Description=NccHub の自動更新（release branch を追従）
+After=network-online.target works-server.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# update.sh が差分の有無を見て、無ければ何もせず終了する。
+# バックアップ・health 検証・失敗時のロールバックは update.sh 側が持つ。
+ExecStart=/opt/works/src/deploy/update.sh --ref release
+# ビルドが長引いてもタイマーの次回発火と重ならないようにする。
+TimeoutStartSec=3600

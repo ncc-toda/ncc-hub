@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  # main への push は release branch を進めるので、途中で打ち切らない。
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check:
+    # 学内サーバーは amd64。同じアーキでビルドが通ることを確認する。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      # flake.lock をピンしているので、依存の大半は cache.nixos.org から降ってくる。
+      # ここで落ちるのは vendorHash / npmDepsHash のずれか、本体のビルドエラー。
+      - name: nix build
+        run: nix build .#default --print-build-logs
+
+      # just lint の svelte-check は node_modules を要求する。
+      - name: web 依存を導入
+        run: nix develop -c bash -c 'cd web && npm ci'
+
+      - name: lint
+        run: nix develop -c just lint
+
+      - name: test
+        run: nix develop -c just test
+
+      # 成果物が想定どおりの形か（バイナリと pb_public の2点セット）を確認する。
+      - name: 成果物の検査
+        run: |
+          test -x result/bin/works-server
+          test -f result/share/works/pb_public/index.html
+          grep -q ffmpeg result/bin/works-server   # makeWrapper の PATH 注入
+
+  # CI が通った main だけを release へ進める。学内サーバーはこの branch を追従する。
+  release:
+    needs: check
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # fast-forward のみ。main を force-push で書き換えるとここが落ちる。
+      # その場合は意図した書き換えか確認してから release を手で合わせること。
+      - name: release を main へ進める
+        run: git push origin "${{ github.sha }}:refs/heads/release"

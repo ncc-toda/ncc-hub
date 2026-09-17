@@ -1,0 +1,16 @@
+[Unit]
+Description=NccHub の自動更新タイマー
+# 文化祭など、更新を止めたい期間は次で無効化する:
+#   sudo systemctl disable --now works-update.timer
+# 再開する:
+#   sudo systemctl enable --now works-update.timer
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=10min
+# 複数台が同時に取りに行かないよう散らす（将来の増設用）。
+RandomizedDelaySec=2min
+Persistent=false
+
+[Install]
+WantedBy=timers.target

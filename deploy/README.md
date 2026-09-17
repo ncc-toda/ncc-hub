@@ -9,6 +9,7 @@
 | `update.sh` | 更新デプロイ。health 失敗時は直前のリリースへ自動で戻す |
 | `backup.sh` | バックアップ。既定は管理 API 経由（ホット）、`--cold` で停止＋tar |
 | `works-server.service` | systemd unit のテンプレート。install.sh がパスを置換して配置する |
+| `works-update.service` / `.timer` | 自動更新（CD）。`release` branch を10分ごとに追従する |
 | `nixos-module.nix` | サーバーが NixOS の場合のモジュール（`services.works`） |
 | `test/` | systemd 入り Ubuntu コンテナでの検証一式 |
 

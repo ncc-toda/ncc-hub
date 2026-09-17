@@ -68,6 +68,8 @@ cmd_up() {
 cmd_sync() {
   info "作業ツリーを /opt/works/src へ流し込む"
   dex mkdir -p /opt/works/src
+  # tar を root で展開するとアーカイブ側の uid が復元され、/opt/works/src は非 root 所有になる。
+  # これは意図的に残す。git の safe.directory を踏む厳しめの条件で CD を検証できるため。
   # .git は含める（nix の git fetcher が必要）。node_modules と pb_data は除外。
   # COPYFILE_DISABLE=1 は macOS の tar が ._* を作るのを防ぐ。
   COPYFILE_DISABLE=1 tar --no-xattrs -C "$REPO_ROOT" -cf - \
@@ -220,6 +222,41 @@ cmd_rollback() {
 }
 
 # docker commit は既定でコンテナを一時停止する。/nix 込みで数 GB あるため数分かかる。
+# CD タイマーの検証。最重要は「変更が無いときにバックアップを作らないこと」。
+# タイマーは10分ごとに回るので、ここが漏れると1日144個のバックアップが積まれる。
+cmd_cd() {
+  info "CD: release branch と自動更新タイマー"
+  # sync は .git/config ごと流し込むので origin が GitHub に戻る。必要なら張り直す。
+  dexb 'git -C /opt/works/src remote get-url origin | grep -q "^/opt/works/origin.git$"' || cmd_origin
+  # ハーネスでは前回実行の release ref が残るので force で揃える。
+  # 本番の CI は fast-forward のみ（main の書き換えを検知するため）。
+  dexb 'cd /opt/works/src && git branch -D release >/dev/null 2>&1; \
+        git push -q -f origin HEAD:release && git branch -f release HEAD'
+  dexb 'sed -i "s|^WORKS_REF=.*|WORKS_REF=release|" /etc/works/install.env'
+  dex bash /opt/works/src/deploy/install.sh --skip-clone --skip-tunnel -y \
+      --admin-email admin@example.com --generate-admin-password --enable-cd
+  check "works-update.timer が有効"  dexb 'systemctl is-enabled --quiet works-update.timer'
+  check "works-update.timer が稼働"  dexb 'systemctl is-active --quiet works-update.timer'
+
+  info "変更が無いとき、バックアップを作らずに抜けること"
+  local before after
+  before=$(dex bash -lc 'ls -1 /var/lib/works/pb_data/backups/ 2>/dev/null | wc -l' | tr -d ' ')
+  dex systemctl start works-update.service
+  after=$(dex bash -lc 'ls -1 /var/lib/works/pb_data/backups/ 2>/dev/null | wc -l' | tr -d ' ')
+  if [ "$before" = "$after" ]; then
+    printf '  %sPASS%s バックアップが増えていない (%s個のまま)\n' "$C_OK" "$C_0" "$before"
+  else
+    printf '  %sFAIL%s バックアップが %s -> %s に増えた\n' "$C_NG" "$C_0" "$before" "$after"; FAILED=1
+  fi
+  check "更新サービスが正常終了" dexb 'systemctl show -p Result --value works-update.service | grep -q success'
+  check "更新後も health が 200" dexb 'curl -fsS --max-time 10 http://127.0.0.1:8090/api/health'
+
+  info "止められること"
+  dex systemctl disable --now works-update.timer
+  check "タイマーを止められた" dexb '! systemctl is-active --quiet works-update.timer'
+  [ "$FAILED" = 0 ] || die "CD の検証に失敗しました"
+}
+
 cmd_snapshot() {
   info "スナップショット $SNAPSHOT を作成（/nix 込みで数分かかります）"
   docker commit "$NAME" "$SNAPSHOT" >/dev/null
@@ -231,15 +268,16 @@ cmd_logs()     { dex journalctl -u works-server -n "${1:-80}" --no-pager; }
 cmd_down()     { docker rm -f "$NAME" >/dev/null 2>&1 || true; info "コンテナを破棄"; }
 
 cmd_all() {
-  cmd_up; cmd_sync; cmd_dryrun; cmd_install; cmd_verify; cmd_snapshot
-  cmd_idempotent; cmd_backup; cmd_origin; cmd_update; cmd_rollback
+  cmd_up; cmd_sync; cmd_dryrun; cmd_install; cmd_verify
+  cmd_idempotent; cmd_backup; cmd_origin; cmd_update; cmd_rollback; cmd_cd
   info "一気通貫の検証が完了しました"
+  info "反復するなら 'snapshot' でイメージを保存し、'reset' で復元できます"
 }
 
 [ $# -gt 0 ] || { grep -E '^cmd_[a-z]+\(\)' "$0" | sed 's/^cmd_/  /;s/().*//' >&2; die "サブコマンドを指定してください"; }
 for sub in "$@"; do
   case $sub in
-    build|up|sync|dryrun|install|verify|idempotent|backup|origin|update|rollback|snapshot|reset|shell|logs|down|all) "cmd_$sub" ;;
+    build|up|sync|dryrun|install|verify|idempotent|backup|origin|update|rollback|cd|snapshot|reset|shell|logs|down|all) "cmd_$sub" ;;
     *) die "未知のサブコマンド: $sub" ;;
   esac
 done
