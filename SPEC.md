@@ -116,10 +116,12 @@
 │   │   └── routes/        # 画面
 │   └── dist/              # ビルド成果物（.gitignore）
 └── deploy/
-    ├── works-server.service     # systemd unit
-    ├── cloudflared.service      # systemd unit（cloudflared 同梱の service install でも可）
-    ├── cloudflared.config.yml.example
-    └── nixos-module.nix         # 任意: サーバーが NixOS の場合
+    ├── install.sh               # ワンショットインストーラ（冪等）
+    ├── update.sh                # 更新デプロイ（health 失敗時に自動ロールバック）
+    ├── backup.sh                # バックアップ（管理 API 経由／--cold）
+    ├── works-server.service     # systemd unit のテンプレート
+    ├── nixos-module.nix         # 任意: サーバーが NixOS の場合
+    └── test/                    # systemd 入り Ubuntu コンテナでの検証一式
 ```
 
 ---
@@ -691,22 +693,49 @@ exiftool -all= -overwrite_original -q <file>...
 
 ### 12.1 前提
 
-- 学内サーバー：Linux（x86_64 想定）。Nix（multi-user）インストール済みなら §12.2、無ければ §12.3。
-- Cloudflare アカウント（無料）と、Cloudflare にネームサーバーを向けた独自ドメイン1つ。ホスト名は例として `works.example.jp` とする。
-- 学内サーバーからインターネットへ HTTPS（443）の外向き接続ができること。
+- 学内サーバー：Linux（Ubuntu / Debian、x86_64 または aarch64）。systemd があること。
+- メモリ 4GB 以上（swap 含む）。`/nix` 側に 20GB、データ側に 10GB 以上の空き。
+- Cloudflare アカウント（無料）と、Cloudflare にネームサーバーを向けた zone 1つ。ホスト名は例として `works.example.jp` とする。
+- 学内サーバーからインターネットへ HTTPS（443）の外向き接続ができること。UDP/7844 が通らない場合は §12.4 の http2 フォールバックを使う。
 
-### 12.2 Nix がある場合
+公開ドメインについて、Cloudflare の無料プランでは **サブドメイン単独の zone を作れない**（subdomain setup は Enterprise 限定、partial/CNAME setup は Business 以上）。したがって取り得る経路は次の2つに限られる。
+
+- **経路A：学校ドメイン全体を Cloudflare へ NS 委任する。** MX、SPF、DKIM、既存 Web のレコードをすべて移すため、移行ミスが学校のメールを止める。情報システム管理者の承認と作業窓口が必須。
+- **経路B：独自ドメインを1つ新規取得して Cloudflare へ委任する。** 学校の既存 DNS に一切触らない。校内ハッカソンという用途に対しては経路Bを推奨する。
+
+### 12.2 インストール（`deploy/install.sh`）
+
+学内サーバー上で次の1コマンドを実行する。Nix の導入からサービス起動までを行い、再実行しても安全（冪等）である。
 
 ```sh
-git clone <repo> /opt/works/src
-cd /opt/works/src
-nix build .#default -o /opt/works/current
-sudo useradd -r -s /usr/sbin/nologin works
-sudo mkdir -p /var/lib/works/pb_data && sudo chown -R works:works /var/lib/works
-sudo cp deploy/works-server.service /etc/systemd/system/
-sudo systemctl enable --now works-server
-/opt/works/current/bin/works-server superuser create <email> <password> --dir=/var/lib/works/pb_data
+curl -fsSL https://raw.githubusercontent.com/ncc-toda/ncc-hub/main/deploy/install.sh -o install.sh
+sudo bash install.sh \
+  --admin-email <先生のメール> \
+  --generate-admin-password \
+  --tunnel-token-file /path/to/token.txt \
+  --event-name '文化祭くじ引きアプリ ハッカソン 2026' \
+  --event-slug fes2026 \
+  --event-passphrase-file /path/to/passphrase.txt
 ```
+
+スクリプトが行うこと。
+
+1. 前提検査（root、systemd、OS、アーキ、ディスク、メモリ、外向き疎通、時刻同期）
+2. Nix（multi-user）の導入。既に入っていればスキップする
+3. `works` システムユーザーと `/var/lib/works/pb_data` の作成
+4. `/opt/works/src` へリポジトリを取得（full clone。shallow は nix の git fetcher が revision を解決できないため使わない）
+5. `nix build .#default -o /opt/works/releases/<sha>` でビルドし、`/opt/works/current` を `mv -T` で原子的に切り替える
+6. superuser の作成（**サービス起動前**に `runuser -u works` で実行する）
+7. `deploy/works-server.service` を配置して起動し、`/api/health` で待機する
+8. `--event-*` が与えられていれば `events` を1件投入する
+9. `--tunnel-token*` が与えられていれば cloudflared を導入してトンネルを登録する
+10. 残る手作業のチェックリストを出力する
+
+秘密情報は `--admin-password-file` / `--tunnel-token-file` / `--event-passphrase-file` で渡すのが既定の作法とする。値を直接渡す `--admin-password` 等も受け付けるが、`ps` に露出するため警告を出す。
+
+**リリースディレクトリ方式にする理由。** `nix build -o /opt/works/current` のように `current` を直接 out-link にすると、切り替えた瞬間に旧世代の GC ルートが失われ、ロールバック先が `nix-collect-garbage` で消える。`/opt/works/releases/<sha>` を out-link（GC ルート）にし、`current` はそれを指す素の symlink にすることで直近数世代が保護される。`releases/` 配下の symlink を手で削除してはならない。
+
+**superuser をサービス起動前に作る理由。** SQLite を同時に開くプロセスが存在しない状態でマイグレーションと superuser 作成が完了し、かつポートが開く時点で既に superuser が存在するため、PocketBase の「最初の superuser を作成」画面が一瞬も外部へ露出しない。root で実行すると `pb_data` に root 所有のファイルが作られてサービスが書けなくなるため、`runuser -u works` は必須である。
 
 `deploy/works-server.service`：
 
@@ -726,6 +755,9 @@ ExecStart=/opt/works/current/bin/works-server serve \
   --publicDir=/opt/works/current/share/works/pb_public
 Restart=always
 RestartSec=5
+TimeoutStopSec=30
+LimitNOFILE=8192
+# WORKS_* の既定値は SPEC §10.5 を参照。変更が必要なものだけここに書く。
 Environment=WORKS_FFMPEG_THREADS=2
 # ハードニング
 NoNewPrivileges=true
@@ -737,46 +769,42 @@ PrivateTmp=true
 WantedBy=multi-user.target
 ```
 
-更新：`nix build .#default -o /opt/works/current && sudo systemctl restart works-server`。マイグレーションは起動時に自動適用（本番でも `migratecmd` の Automigrate は **off**、コード内 `migrations` パッケージの登録分のみ適用）。
+サーバーが NixOS なら `deploy/nixos-module.nix` を使う。オプションは `services.works` で、`package`（必須）、`dataDir`、`listenAddr`、`environment` を取る。
 
-サーバーが NixOS なら `deploy/nixos-module.nix` を使い、`services.works.enable = true;` で上記と同等の設定になるようにする（任意）。
+### 12.3 更新（`deploy/update.sh`）
 
-### 12.3 Nix が無い場合
+```sh
+sudo /opt/works/src/deploy/update.sh
+```
 
-開発機で `nix build .#default` し、`result/bin/works-server`（Go 静的バイナリ）と `result/share/works/pb_public` を `scp` する。ffmpeg・exiftool はディストリのパッケージ（`apt install ffmpeg libimage-exiftool-perl`）を入れ、`WORKS_FFMPEG_BIN` 等で必要なら明示。systemd unit は 12.2 と同じ。
+更新前バックアップ → fetch → ビルド → `current` の原子的切替 → restart → `/api/health` 検証、の順で進み、health が通らなければ直前のリリースへ戻して再起動する。マイグレーションは起動時に自動適用される（本番でも `migratecmd` の Automigrate は **off**、コード内 `migrations` パッケージの登録分のみ適用）。スキーマ変更はバイナリを戻しても戻らないため、更新前バックアップは既定で取る。
 
 ### 12.4 Cloudflare
 
-1. **Tunnel 作成**（学内サーバー上）
-   ```sh
-   cloudflared tunnel login
-   cloudflared tunnel create works
-   cloudflared tunnel route dns works works.example.jp
-   ```
-2. `~/.cloudflared/config.yml`（`deploy/cloudflared.config.yml.example` を参照）
-   ```yaml
-   tunnel: <TUNNEL_ID>
-   credentials-file: /etc/cloudflared/<TUNNEL_ID>.json
-   ingress:
-     - hostname: works.example.jp
-       service: http://127.0.0.1:8090
-       originRequest:
-         noTLSVerify: true
-     - service: http_status:404
-   ```
-3. `sudo cloudflared service install` で systemd 登録（または `deploy/cloudflared.service`）。
-4. ダッシュボード設定
-   - SSL/TLS：Full（Tunnel なので実質どちらでも可）
+トンネルは **ダッシュボード管理方式（token）** を使う。`cloudflared tunnel login` のブラウザ認証、`config.yml`、credentials ファイルがいずれも不要になり、ingress とホスト名の設定がダッシュボード側に集約される。結果として install.sh は公開ドメインに依存しない。
+
+1. **Tunnel 作成**（Cloudflare ダッシュボード）
+   Zero Trust → Networks → Tunnels → Create a tunnel → Cloudflared を選び、表示される token を控える。install.sh に `--tunnel-token-file` で渡す。
+2. **Public Hostname の設定**（ダッシュボード）
+   作成したトンネルの Public Hostname に公開ホスト名を設定し、Service を `http://127.0.0.1:8090` にする。
+3. **ダッシュボード設定**
+   - SSL/TLS：Full
    - Security → WAF → Rate limiting rules：`(http.request.method eq "POST" and http.request.uri.path contains "/api/")` を 60 req/分 でブロック（無料枠1本）
    - Zero Trust → Access → Applications：`works.example.jp/_/*` と `works.example.jp/api/collections/_superusers/*` に Self-hosted アプリを作り、ポリシー「メールが `<管理者のメール>` に一致 → Allow（One-time PIN）」。**それ以外のパスには Access を掛けない**（学生には合言葉のみ）
    - Caching：既定でよい。`/api/files/*` はキャッシュされても問題ない（乱数名なので更新時はURLが変わる）
-5. 確認：`curl -sI https://works.example.jp/api/health` が 200。
+4. **確認**：`curl -sI https://works.example.jp/api/health` が 200。
+5. **UDP が塞がれている場合**：`journalctl -u cloudflared` に `Registered tunnel connection` が出なければ、学内ファイアウォールが QUIC（UDP/7844）を遮断している。install.sh に `--tunnel-protocol http2` を付けて再実行する。
+
+works-server は `127.0.0.1` のみで待ち受けるため、ルーターやファイアウォールで 8090 を開けてはならない。
 
 ### 12.5 バックアップ
 
-- PocketBase 内蔵バックアップを有効化：Settings → Backups で cron `0 3 * * *`、保持 7 世代（マイグレーションで `settings.Backups` に書いてもよい）。`pb_data/backups/` に zip が作られる。
-- 週1回、`pb_data/backups/` を別マシン（先生のPC等）へ `rsync` する運用を README に書く。
-- 復元：`works-server` を止め、zip を `pb_data` に展開し直す。
+- **日次自動**：`0 3 * * *`、保持7世代。マイグレーション（`internal/migrations`）で `settings.Backups` に設定済みで、手作業は不要。`pb_data/backups/` に zip が作られる。
+- **手動**：`sudo /opt/works/src/deploy/backup.sh`。管理 API の `POST /api/backups` を叩くため、**稼働中のプロセス内で**日次バックアップと同じコードパスを通る。
+  PocketBase の `CreateBackup` は zip 生成中に削除・追加された storage ファイルを同一プロセス内のフックで検出して除外する。したがって **別プロセスの CLI から実行してはならない**。アップロードや ffmpeg 変換が走っている最中に取ると、動画が途中まで書かれた状態で zip に入る。
+- **コールド取得**：`deploy/backup.sh --cold` はサービスを停止して `pb_data` を tar で固める。リストア直前やマイグレーションを伴う作業の直前に使う。
+- 週1回、`pb_data/backups/` を別マシン（先生のPC等）へ `rsync` する。
+- **復元**：`works-server` を止め、zip を `pb_data` に展開し直す。または管理画面の Backups から復元する。
 
 ---
 
@@ -830,7 +858,7 @@ WantedBy=multi-user.target
 
 ## 16. 未決事項・注意
 
-- PocketBase の Go API（`core.RequestEvent`、`filesystem.NewFileFromPath`、`Fields.Add`、`hidden` フィールド、`_via_` 逆参照など）は v0.23 系を前提に書いている。実装時に使用バージョンのドキュメントで名称を確認し、差異があれば本書を更新する。
+- PocketBase は v0.40.3 を使用している（`server/go.mod`）。本書の Go API 記述は当初 v0.23 系を前提に書かれていたため、実装と食い違う箇所があれば実装側を正とし、本書を更新する。
 - ファイル置き換え時に PocketBase が旧ファイルを自動削除するかは M4 でテストして確定する。
 - 学内サーバーの外部公開（トンネル経由）が学校の方針上問題ないかは、着手前に一度確認する。
 - 単一ファイル 2GB の結合・変換で一時的に最大 ~5GB のディスクを使う。`pb_data` は十分な空きのあるパーティションに置く。

@@ -13,6 +13,9 @@ ExecStart=/opt/works/current/bin/works-server serve \
   --publicDir=/opt/works/current/share/works/pb_public
 Restart=always
 RestartSec=5
+TimeoutStopSec=30
+LimitNOFILE=8192
+# WORKS_* の既定値は SPEC §10.5 を参照。変更が必要なものだけここに書く。
 Environment=WORKS_FFMPEG_THREADS=2
 # ハードニング
 NoNewPrivileges=true

@@ -18,6 +18,20 @@
 - 公開インフラ: 学内 Linux サーバー + Cloudflare Tunnel
 - 開発環境: Nix flake（`nix develop`）
 
+## デプロイ
+
+学内 Linux サーバーへの設置は 1 コマンドで完結します。
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ncc-toda/ncc-hub/main/deploy/install.sh -o install.sh
+sudo bash install.sh --admin-email <先生のメール> --generate-admin-password \
+                     --tunnel-token-file /root/tunnel-token.txt
+```
+
+Nix の導入、ビルド、systemd 登録、管理者作成、Cloudflare Tunnel の登録までを行い、
+最後に Cloudflare ダッシュボード側で必要な手作業をチェックリストとして出力します。
+再実行しても安全です。手順の詳細は [docs/deployment.md](./docs/deployment.md) を参照してください。
+
 ## 開発クイックスタート
 
 開発環境のツールチェーンは Nix flake で固定されています。
@@ -46,8 +60,9 @@ just superuser admin@example.com <20文字以上のパスワード>
 | `just lint` | `golangci-lint` と `svelte-check` を実行します。 |
 | `just test` | Go のユニットテストを実行します。 |
 | `just build` | `nix build .#default` で成果物を生成します。 |
-| `just backup` | SQLite データベースの手動バックアップを取得します。 |
-| `just superuser <email> <password>` | 初期管理者アカウントを作成します。 |
+| `just backup` | バックアップの取得方法を案内します（本番は `deploy/backup.sh`）。 |
+| `just superuser <email> <password>` | 初期管理者アカウントを作成します（開発用）。 |
+| `just test-deploy` | `deploy/install.sh` を Ubuntu コンテナで検証します。 |
 
 ## ドキュメント
 
@@ -65,7 +80,7 @@ just superuser admin@example.com <20文字以上のパスワード>
 .
 ├── server/     # Go バックエンド（PocketBase 組み込み、ffmpeg 変換、cron）
 ├── web/        # Svelte 5 フロントエンド（SPA）
-├── deploy/     # systemd unit、Cloudflare 設定例、NixOS モジュール
+├── deploy/     # install.sh / update.sh / backup.sh、systemd unit、NixOS モジュール
 ├── docs/       # 先生向け運用マニュアル、デプロイ手順書
 ├── flake.nix   # 開発環境およびパッケージ定義
 ├── justfile    # 開発用コマンド定義

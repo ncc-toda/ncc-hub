@@ -18,7 +18,7 @@
           packages = with pkgs; [
             go_1_27 gopls golangci-lint
             nodejs_22
-            ffmpeg exiftool cloudflared sqlite just prettier
+            ffmpeg exiftool cloudflared sqlite just prettier shellcheck
           ];
           shellHook = ''
             export WORKS_DEV=1
@@ -31,7 +31,7 @@
             pname = "works-server";
             version = "0.1.0";
             src = ./server;
-            vendorHash = "sha256-KnDWngI1FPXHxZ6rHItZry3QX2TYWX06mHdC4/jWrrI=";
+            vendorHash = "sha256-YOV1etT91CnonkSklOpiuivLWoihr0/jJURMZUNHlsQ=";
             subPackages = [ "cmd/server" ];
             nativeBuildInputs = [ pkgs.makeWrapper ];
             postInstall = ''
