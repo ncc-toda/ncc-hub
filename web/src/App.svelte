@@ -24,7 +24,7 @@
 <header class="topbar">
   <div class="topbar-inner">
     <div class="brand-area">
-      <a class="brand" href={homeHref} onclick={onLinkClick}>作品ひろば</a>
+      <a class="brand" href={homeHref} onclick={onLinkClick}>NccHub</a>
       {#if route.params.slug}
         <span class="crumb">/ {route.params.slug}</span>
       {/if}

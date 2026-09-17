@@ -51,7 +51,7 @@
 {:else}
   <div class="select-wrap">
     <form class="card select-card" onsubmit={submit}>
-      <h1>作品ひろば</h1>
+      <h1>NccHub</h1>
       <p class="hint">先生から配られたイベントIDと合言葉を入力してください。</p>
       <div class="field">
         <label for="ev-slug">イベントID</label>

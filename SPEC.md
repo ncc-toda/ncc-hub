@@ -1,4 +1,4 @@
-# 学内作品共有サイト（学内版ProtoPedia）仕様書
+# 学内作品共有サイト NccHub 仕様書
 
 - 版：v1.0（2026-09-11）
 - 対象読者：実装を担当するAIコーディングエージェント／開発者
@@ -89,8 +89,11 @@
 ├── flake.lock
 ├── .envrc                 # direnv 用: use flake
 ├── justfile               # 開発タスク
-├── README.md              # セットアップ手順（本書の §12, §13 を要約）
+├── README.md              # 開発者ポータル・セットアップ手順
 ├── SPEC.md                # 本書
+├── docs/
+│   ├── admin-guide.md     # 先生向け運用マニュアル（本書の §13 を整理）
+│   └── deployment.md      # デプロイ・インフラ手順書（本書の §12 を整理）
 ├── server/
 │   ├── go.mod
 │   ├── cmd/server/main.go # PocketBase 組み込み、ルート・cron・マイグレーション登録
