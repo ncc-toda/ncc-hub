@@ -55,8 +55,13 @@ runsh() {
 }
 
 usage() {
-  sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'
   cat <<'USAGE'
+NccHub ワンショットインストーラ（Ubuntu / Debian）
+
+  sudo bash install.sh --admin-email <mail> --generate-admin-password \
+                       --tunnel-token-file /path/to/token.txt
+
+再実行しても安全（冪等）。詳細は docs/deployment.md を参照。
 
 主なオプション:
   --admin-email EMAIL              管理者(superuser)のメール
