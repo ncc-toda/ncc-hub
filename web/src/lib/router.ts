@@ -1,7 +1,8 @@
 /**
  * 最小限の history API ルーター。
- * `navigate()` は pushState/replaceState 後に popstate イベントを発火させ、
- * App.svelte がそれを購読して再描画する。
+ * `navigate()` は history を更新したあと購読者へ直接通知する。
+ * 合成 popstate に頼ると、子の $effect が親の listener 登録より先に走ったとき
+ * 初回リダイレクトが届かず「移動中…」のまま固まる。
  */
 
 export type RouteName =
@@ -16,6 +17,21 @@ export type RouteName =
 export interface Route {
   name: RouteName;
   params: Record<string, string>;
+}
+
+type PathListener = (path: string) => void;
+const listeners = new Set<PathListener>();
+
+export function subscribePath(listener: PathListener): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+function emit(): void {
+  const path = location.pathname;
+  for (const listener of listeners) listener(path);
 }
 
 export function matchRoute(pathname: string): Route {
@@ -42,8 +58,10 @@ export function navigate(path: string, opts: { replace?: boolean } = {}): void {
   } else {
     history.pushState(null, '', path);
   }
-  window.dispatchEvent(new PopStateEvent('popstate'));
+  emit();
 }
+
+window.addEventListener('popstate', emit);
 
 /** `<a href="..." onclick={onLinkClick}>` 用。修飾キー付きクリックはブラウザに任せる。 */
 export function onLinkClick(e: MouseEvent): void {

@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { matchRoute, onLinkClick } from './lib/router';
+  import { onDestroy } from 'svelte';
+  import { matchRoute, onLinkClick, subscribePath } from './lib/router';
   import EventSelect from './routes/EventSelect.svelte';
   import KeyManager from './routes/KeyManager.svelte';
   import WorkDetail from './routes/WorkDetail.svelte';
@@ -9,14 +10,13 @@
   let path = $state(location.pathname);
   const route = $derived(matchRoute(path));
 
-  $effect(() => {
-    const handler = () => {
-      path = location.pathname;
+  // 子の $effect より先に購読する。$effect 内だと初回 navigate を取りこぼす。
+  onDestroy(
+    subscribePath((next) => {
+      path = next;
       window.scrollTo(0, 0);
-    };
-    window.addEventListener('popstate', handler);
-    return () => window.removeEventListener('popstate', handler);
-  });
+    }),
+  );
 
   const homeHref = $derived(route.params.slug ? `/e/${route.params.slug}` : '/');
 </script>
