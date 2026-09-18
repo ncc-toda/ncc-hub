@@ -234,6 +234,7 @@
     display: grid;
     grid-template-columns: 1fr;
     gap: 24px;
+    align-items: stretch;
   }
 
   @media (min-width: 560px) {

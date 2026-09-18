@@ -59,6 +59,7 @@
   .work-card {
     display: flex;
     flex-direction: column;
+    height: 100%;
     overflow: hidden;
     color: inherit;
     transition: background var(--transition-fast);
@@ -69,22 +70,33 @@
     background: var(--fill);
   }
 
+  /*
+   * サムネイル枠は全カード同じ大きさにする。
+   * 画像の固有サイズで枠が伸びないよう、中身は絶対配置する。
+   * 3:4 は縦長動画が枠いっぱいに見え、横長は中央トリミング。
+   */
   .thumb {
     position: relative;
-    aspect-ratio: 3 / 2;
+    aspect-ratio: 3 / 4;
+    flex-shrink: 0;
+    overflow: hidden;
     background: var(--fill);
   }
 
-  .thumb img {
+  .thumb img,
+  .placeholder {
+    position: absolute;
+    inset: 0;
     width: 100%;
     height: 100%;
+  }
+
+  .thumb img {
     object-fit: cover;
     display: block;
   }
 
   .placeholder {
-    width: 100%;
-    height: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -125,6 +137,8 @@
     margin: 0;
     font-size: 0.95rem;
     font-weight: 700;
+    line-height: 1.35;
+    min-height: calc(1.35em * 2);
     display: -webkit-box;
     -webkit-line-clamp: 2;
     line-clamp: 2;
