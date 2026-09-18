@@ -229,7 +229,7 @@ dev:
     just dev-server & just dev-web; wait
 
 dev-server:
-    cd server && go run ./cmd/server serve --http=127.0.0.1:8090 --dir=./pb_data --automigrate
+    cd server && go run ./cmd/server serve --http=127.0.0.1:8090 --dir=./pb_data --automigrate --dev
 
 dev-web:
     cd web && npm run dev
@@ -257,6 +257,30 @@ backup:
 ```
 use flake
 ```
+
+### 5.5 開発用フレーバー
+
+`just dev` は空の `pb_data` でもイベント一覧まで到達できる。
+投入は `--dev` かつ待ち受けがループバックのときだけ行う。
+本番の systemd と `nix build` 成果物には `--dev` を付けない。
+`--dev` は PocketBase 標準フラグである。
+`go run` では既定で有効になる。
+待ち受けがループバック以外の `--dev` は起動失敗とする。
+`WORKS_DEV` は未使用である。
+既存の superuser・イベント・作品は上書きしない。
+
+| 項目 | 値 |
+|---|---|
+| イベント `slug` | `dev` |
+| 合言葉 | `dev-aikotoba`（8 文字以上） |
+| superuser | `dev@example.com` / `ncc-hub-dev-admin-pass`（20 文字以上。0 件のときだけ作成） |
+| サンプル作品 | `dev` に作品が無ければ 2 件。中身条件は `video_url`。いいね数を変えてソート確認用にする |
+
+起動ログに slug・合言葉・作品コード・編集キーを出す。
+フロントは `import.meta.env.DEV` のときだけ「開発環境」バーを出す。
+トップは `/e/dev` を開き、合言葉を自動入力する。
+API の合言葉検査は変えない。
+`vite build` 後の `pb_public` には開発用 UI を残さない。
 
 ---
 ## 6. データモデル

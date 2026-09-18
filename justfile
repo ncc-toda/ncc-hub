@@ -5,7 +5,7 @@ dev:
     just dev-server & just dev-web; wait
 
 dev-server:
-    cd server && go run ./cmd/server serve --http=127.0.0.1:8090 --dir=./pb_data --automigrate
+    cd server && go run ./cmd/server serve --http=127.0.0.1:8090 --dir=./pb_data --automigrate --dev
 
 dev-web:
     cd web && npm run dev

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
+  import { DEV_EVENT_SLUG, isDevFlavor } from './lib/dev';
   import { matchRoute, onLinkClick, subscribePath } from './lib/router';
   import EventSelect from './routes/EventSelect.svelte';
   import KeyManager from './routes/KeyManager.svelte';
@@ -7,6 +8,7 @@
   import WorkForm from './routes/WorkForm.svelte';
   import WorkList from './routes/WorkList.svelte';
 
+  const devListHref = `/e/${DEV_EVENT_SLUG}`;
   let path = $state(location.pathname);
   const route = $derived(matchRoute(path));
 
@@ -22,6 +24,12 @@
 </script>
 
 <header class="topbar">
+  {#if isDevFlavor}
+    <div class="dev-banner" role="status">
+      開発環境
+      <a href={devListHref} onclick={onLinkClick}>{devListHref}</a>
+    </div>
+  {/if}
   <div class="topbar-inner">
     <div class="brand-area">
       <a class="brand" href={homeHref} onclick={onLinkClick}>NccHub</a>
@@ -68,6 +76,22 @@
 </footer>
 
 <style>
+  .dev-banner {
+    background: var(--color-warning-subtle);
+    color: var(--color-warning);
+    border-bottom: var(--hairline);
+    font-size: var(--text-xs);
+    font-weight: var(--font-bold);
+    letter-spacing: 0.04em;
+    text-align: center;
+    padding: 6px 16px;
+  }
+
+  .dev-banner a {
+    color: inherit;
+    margin-left: 8px;
+  }
+
   .topbar {
     position: sticky;
     top: 0;

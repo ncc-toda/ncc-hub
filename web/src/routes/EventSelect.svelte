@@ -1,18 +1,25 @@
 <script lang="ts">
   import { ApiError, resolveEvent } from '../lib/api';
+  import { DEV_EVENT_SLUG, DEV_PASSPHRASE, ensureDevEventKey, isDevFlavor } from '../lib/dev';
   import { errMsg } from '../lib/errors';
   import { getEventKeys, removeEventKey, setEventKey } from '../lib/keys';
   import { navigate } from '../lib/router';
 
+  if (isDevFlavor) ensureDevEventKey();
+
   const knownSlugs = Object.keys(getEventKeys());
-  const redirectTo = knownSlugs.length > 0 ? knownSlugs[knownSlugs.length - 1] : null;
+  const redirectTo = isDevFlavor
+    ? DEV_EVENT_SLUG
+    : knownSlugs.length > 0
+      ? knownSlugs[knownSlugs.length - 1]
+      : null;
 
   $effect(() => {
     if (redirectTo) navigate(`/e/${redirectTo}`, { replace: true });
   });
 
-  let slug = $state('');
-  let passphrase = $state('');
+  let slug = $state(isDevFlavor ? DEV_EVENT_SLUG : '');
+  let passphrase = $state(isDevFlavor ? DEV_PASSPHRASE : '');
   let busy = $state(false);
   let error = $state('');
 

@@ -44,13 +44,16 @@ nix develop
 
 # server (127.0.0.1:8090) と web (127.0.0.1:5173) を同時起動
 just dev
-
-# 初回のみ: 管理者アカウント（superuser）を作成
-just superuser admin@example.com <20文字以上のパスワード>
 ```
+
+`just dev` は開発用イベント `dev`（合言葉 `dev-aikotoba`）とサンプル作品を投入します。
+ブラウザで http://127.0.0.1:5173 を開くと `/e/dev` に入ります。
 
 - フロントエンド: http://127.0.0.1:5173（`/api` と `/_/` は 8090 へプロキシ）
 - PocketBase 管理画面: http://127.0.0.1:8090/_/
+- 開発用管理者: `dev@example.com` / `ncc-hub-dev-admin-pass`（`pb_data` が空のときだけ作成）
+
+別の管理者を足すときは `just superuser <email> <20文字以上のパスワード>` を使います。
 
 ## コマンド一覧
 
@@ -63,7 +66,7 @@ just superuser admin@example.com <20文字以上のパスワード>
 | `just test` | Go のユニットテストを実行します。 |
 | `just build` | `nix build .#default` で成果物を生成します。 |
 | `just backup` | バックアップの取得方法を案内します（本番は `deploy/backup.sh`）。 |
-| `just superuser <email> <password>` | 初期管理者アカウントを作成します（開発用）。 |
+| `just superuser <email> <password>` | 管理者アカウントを追加します。空の `pb_data` では `just dev` が `dev@example.com` を作ります。 |
 | `just test-deploy` | `deploy/install.sh` を Ubuntu コンテナで検証します。 |
 
 ## ドキュメント

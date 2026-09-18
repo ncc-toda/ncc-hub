@@ -1,5 +1,6 @@
 <script lang="ts">
   import { ApiError, resolveEvent, type EventRecord } from '../lib/api';
+  import { DEV_EVENT_SLUG, DEV_PASSPHRASE, isDevFlavor } from '../lib/dev';
   import { errMsg } from '../lib/errors';
   import { removeEventKey, setEventKey } from '../lib/keys';
 
@@ -12,6 +13,9 @@
   } = $props();
 
   let passphrase = $state('');
+  $effect(() => {
+    if (isDevFlavor && slug === DEV_EVENT_SLUG) passphrase = DEV_PASSPHRASE;
+  });
   let busy = $state(false);
   let error = $state('');
 

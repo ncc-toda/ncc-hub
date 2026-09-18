@@ -12,6 +12,7 @@ import (
 	"github.com/pocketbase/pocketbase/tools/hook"
 
 	"github.com/ncc-toda/ncc-hub/server/internal/auth"
+	"github.com/ncc-toda/ncc-hub/server/internal/devseed"
 	"github.com/ncc-toda/ncc-hub/server/internal/likes"
 	"github.com/ncc-toda/ncc-hub/server/internal/media"
 	_ "github.com/ncc-toda/ncc-hub/server/internal/migrations"
@@ -41,6 +42,7 @@ func main() {
 	upload.Register(app)
 	media.Register(app)
 	likes.Register(app)
+	devseed.Register(app)
 
 	// 静的フロント配信(SPA fallback あり)。カスタムルートより後に評価されるよう優先度を下げる。
 	app.OnServe().Bind(&hook.Handler[*core.ServeEvent]{
