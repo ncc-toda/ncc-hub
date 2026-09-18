@@ -47,7 +47,9 @@
 </script>
 
 {#if redirectTo}
-  <p class="status-msg">移動中…</p>
+  <div class="stage-center">
+    <p class="status-msg">移動中…</p>
+  </div>
 {:else}
   <div class="select-wrap">
     <form class="card select-card" onsubmit={submit}>

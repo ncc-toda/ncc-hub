@@ -109,7 +109,9 @@
     </p>
 
     {#if loading}
-      <p class="status-msg">読み込み中…</p>
+      <div class="stage-center">
+        <p class="status-msg">読み込み中…</p>
+      </div>
     {:else if notFound}
       <div class="stage-center">
         <div class="empty">

@@ -138,11 +138,12 @@
     gap: 4px;
     color: var(--muted);
     font-size: 13px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
     flex-shrink: 0;
   }
 
   .likes.liked {
     color: var(--like);
-    font-weight: 700;
   }
 </style>

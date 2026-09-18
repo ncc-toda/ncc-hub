@@ -11,8 +11,6 @@
  * 3. 構造とリズム:
  *    4px / 8px の偶数グリッド、LINE Seed JP の洗練されたタイポグラフィ、0.5px ヘアライン罫線、10px 角丸を基本単位とする。
  */
-@import url('https://fonts.googleapis.com/css2?family=LINE+Seed+JP:wght@400;700;800&display=swap');
-
 :root {
   color-scheme: light dark;
 
@@ -203,6 +201,12 @@
   box-sizing: border-box;
 }
 
+html {
+  /* コンテンツ長の差で縦スクロールバーが出現・消滅しても、版面幅を動かさない */
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
+}
+
 html,
 body {
   margin: 0;
@@ -280,11 +284,15 @@ select {
   border-radius: var(--radius-md);
   padding: 10px 14px;
   width: 100%;
+  outline: none;
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
+:where(input:not([type='radio'], [type='checkbox'], [type='file'], [type='range'])):focus,
 :where(input:not([type='radio'], [type='checkbox'], [type='file'], [type='range'])):focus-visible,
+textarea:focus,
 textarea:focus-visible,
+select:focus,
 select:focus-visible {
   outline: none;
   border-color: var(--color-primary);

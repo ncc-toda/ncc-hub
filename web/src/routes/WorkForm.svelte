@@ -529,7 +529,9 @@
     {/if}
 
     {#if step === 'loading'}
-      <p class="status-msg">読み込み中…</p>
+      <div class="stage-center">
+        <p class="status-msg">読み込み中…</p>
+      </div>
     {:else if step === 'needkey'}
       <div class="stage-center">
         <form class="card key-form" onsubmit={submitEditKey}>

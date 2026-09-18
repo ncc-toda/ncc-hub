@@ -85,7 +85,7 @@
 
   .like-btn.liked {
     color: var(--like);
-    border: 1.5px solid var(--like);
+    border-color: var(--like);
     background: var(--color-primary-subtle);
   }
 
@@ -100,5 +100,8 @@
 
   .count {
     font-size: 1rem;
+    font-variant-numeric: tabular-nums;
+    min-width: 2ch;
+    text-align: end;
   }
 </style>

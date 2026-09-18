@@ -102,35 +102,37 @@
       </nav>
     </div>
 
-    {#if loading}
-      <p class="status-msg">読み込み中…</p>
-    {:else if error}
-      <div class="error-box">
-        <p>{error}</p>
-        <button type="button" class="btn btn-sm" onclick={() => load(event, () => location.reload())}>
-          再読み込み
-        </button>
-      </div>
-    {:else if filtered.length === 0}
-      <div class="empty">
-        {#if works.length === 0}
-          <p class="status-msg">まだ作品がありません。</p>
-          {#if event.submissions_open}
-            <p class="empty-action">
-              <a href={`/e/${slug}/new`} onclick={onLinkClick}>最初の作品を投稿する</a>
-            </p>
+    <div class="results">
+      {#if loading}
+        <p class="status-msg">読み込み中…</p>
+      {:else if error}
+        <div class="error-box">
+          <p>{error}</p>
+          <button type="button" class="btn btn-sm" onclick={() => load(event, () => location.reload())}>
+            再読み込み
+          </button>
+        </div>
+      {:else if filtered.length === 0}
+        <div class="empty">
+          {#if works.length === 0}
+            <p class="status-msg">まだ作品がありません。</p>
+            {#if event.submissions_open}
+              <p class="empty-action">
+                <a href={`/e/${slug}/new`} onclick={onLinkClick}>最初の作品を投稿する</a>
+              </p>
+            {/if}
+          {:else}
+            <p class="status-msg">一致する作品がありません。</p>
           {/if}
-        {:else}
-          <p class="status-msg">一致する作品がありません。</p>
-        {/if}
-      </div>
-    {:else}
-      <div class="grid">
-        {#each filtered as work (work.id)}
-          <WorkCard {work} {slug} liked={likedIds.has(work.id)} />
-        {/each}
-      </div>
-    {/if}
+        </div>
+      {:else}
+        <div class="grid">
+          {#each filtered as work (work.id)}
+            <WorkCard {work} {slug} liked={likedIds.has(work.id)} />
+          {/each}
+        </div>
+      {/if}
+    </div>
   {/snippet}
 </EventGuard>
 
@@ -203,7 +205,7 @@
     padding: 0 18px;
     min-height: 42px;
     font-size: 0.85rem;
-    font-weight: 400;
+    font-weight: 700;
     color: var(--muted);
     cursor: pointer;
     transition: background var(--transition-fast), color var(--transition-fast);
@@ -221,7 +223,11 @@
   .sort-btn.active {
     background: var(--color-primary);
     color: var(--color-primary-contrast);
-    font-weight: 700;
+  }
+
+  .results {
+    /* カード1段分を確保し、読み込み完了時のフッター跳ねを抑える */
+    min-height: 280px;
   }
 
   .grid {
