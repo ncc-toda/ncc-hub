@@ -5,6 +5,7 @@ result-*
 
 # server
 server/pb_data/
+server/pb_data*/
 server/tmp/
 
 # web
