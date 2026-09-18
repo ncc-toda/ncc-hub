@@ -71,13 +71,12 @@
   }
 
   /*
-   * サムネイル枠は全カード同じ大きさにする。
+   * サムネイル枠は全カード同じ 3:2（横長）にする。
    * 画像の固有サイズで枠が伸びないよう、中身は絶対配置する。
-   * 3:4 は縦長動画が枠いっぱいに見え、横長は中央トリミング。
    */
   .thumb {
     position: relative;
-    aspect-ratio: 3 / 4;
+    aspect-ratio: 3 / 2;
     flex-shrink: 0;
     overflow: hidden;
     background: var(--fill);
