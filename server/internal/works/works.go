@@ -500,7 +500,7 @@ func update(e *core.RequestEvent) error {
 
 	media.StripImageMetadata(e.App, record)
 
-	return e.JSON(http.StatusOK, record)
+	return e.JSON(http.StatusOK, map[string]any{"work": record})
 }
 
 // ---------------------------------------------------------------

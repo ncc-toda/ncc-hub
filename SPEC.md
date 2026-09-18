@@ -122,7 +122,7 @@
     ├── backup.sh                # バックアップ（管理 API 経由／--cold）
     ├── works-server.service     # systemd unit のテンプレート
     ├── nixos-module.nix         # 任意: サーバーが NixOS の場合
-    └── test/                    # systemd 入り Ubuntu コンテナでの検証一式
+    └── test/                    # systemd 入り Ubuntu コンテナでの検証、本番相当のローカル起動
 ```
 
 ---
@@ -237,6 +237,9 @@ dev-web:
 build:
     nix build .#default
 
+preview:
+    bash deploy/test/local-serve.sh
+
 lint:
     cd server && golangci-lint run ./...
     cd web && npm run check
@@ -281,6 +284,31 @@ use flake
 トップは `/e/dev` を開き、合言葉を自動入力する。
 API の合言葉検査は変えない。
 `vite build` 後の `pb_public` には開発用 UI を残さない。
+
+### 5.6 本番相当のローカル起動
+
+`just preview` は本番成果物をこのマシンで起動する。
+成果物は `nix build .#default` である。
+起動フラグは本番の systemd と同じにする。
+`--dev` と `--automigrate` は付けない。
+SPA は `pb_public` から同一オリジンで出す。
+Vite は使わない。
+データは `server/pb_data_preview/` に置く。
+`just dev` の `pb_data` とは混ぜない。
+待ち受けは `127.0.0.1:18090` とする。
+初期イベントは管理者 API で 1 件入れる。
+手順は `install.sh` と同じである。
+`--dev` のシードは使わない。
+
+| 項目 | 値 |
+|---|---|
+| イベント `slug` | `preview` |
+| 合言葉 | `preview-aikotoba`（8 文字以上） |
+| superuser | `preview@example.com` / `ncc-hub-preview-admin-pass`（20 文字以上） |
+
+フロントに開発用バーは出ない。
+合言葉は自動入力しない。
+systemd と `install.sh` の検証は `just test-deploy` を使う。
 
 ---
 ## 6. データモデル
@@ -488,7 +516,9 @@ multipart/form-data。ヘッダ `X-Edit-Key` 必須。
 
 更新の結果、画像・動画・`video_url` がすべて無くなり `video_pending` も無い場合は 422（作成時と同じ中身条件）。更新後は実際のレコード状態で判定できるので、ここは厳密に検証する。
 
-作品コードと編集キーは更新できない。レスポンスにも含めない。
+作品コードと編集キーは更新できない。
+レスポンスは `200 { "work": <works record> }` とする。
+`edit_key` と `work_code` は含めない。
 
 ### 8.4 作品削除 `DELETE /api/x/works/:id`
 

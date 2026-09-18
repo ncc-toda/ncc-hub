@@ -151,6 +151,22 @@ function normalizeWork(w: WorkRecord): WorkRecord {
   };
 }
 
+/** create / video complete は `{ work }`。PATCH は過去にレコード直返しだった。 */
+function workFromBody(body: unknown): WorkRecord {
+  if (!body || typeof body !== 'object') {
+    throw new ApiError(500, STATUS_MESSAGES[500], 'unknown');
+  }
+  const rec = body as Record<string, unknown>;
+  const inner = rec.work;
+  if (inner && typeof inner === 'object' && !Array.isArray(inner)) {
+    return normalizeWork(inner as WorkRecord);
+  }
+  if (typeof rec.id === 'string') {
+    return normalizeWork(body as WorkRecord);
+  }
+  throw new ApiError(500, STATUS_MESSAGES[500], 'unknown');
+}
+
 // ---- 読み取り（標準 Records API） ---------------------------------------
 
 /**
@@ -220,12 +236,12 @@ export async function updateWork(
   editKey: string,
   form: FormData,
 ): Promise<{ work: WorkRecord }> {
-  const r = await apiFetch<{ work: WorkRecord }>(
+  const r = await apiFetch<unknown>(
     `/api/x/works/${encodeURIComponent(id)}`,
     { method: 'PATCH', body: form },
     { slug, editKey },
   );
-  return { work: normalizeWork(r.work) };
+  return { work: workFromBody(r) };
 }
 
 export function deleteWork(slug: string, id: string, editKey: string): Promise<void> {
@@ -309,12 +325,12 @@ export async function videoComplete(
   editKey: string,
   uploadId: string,
 ): Promise<{ work: WorkRecord }> {
-  const r = await apiFetch<{ work: WorkRecord }>(
+  const r = await apiFetch<unknown>(
     `/api/x/works/${encodeURIComponent(workId)}/video/complete/${encodeURIComponent(uploadId)}`,
     { method: 'POST' },
     { slug, editKey },
   );
-  return { work: normalizeWork(r.work) };
+  return { work: workFromBody(r) };
 }
 
 export function videoCancel(slug: string, workId: string, editKey: string, uploadId: string): Promise<void> {

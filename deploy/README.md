@@ -11,7 +11,7 @@
 | `works-server.service` | systemd unit のテンプレート。install.sh がパスを置換して配置する |
 | `works-update.service` / `.timer` | 自動更新（CD）。`release` branch を10分ごとに追従する |
 | `nixos-module.nix` | サーバーが NixOS の場合のモジュール（`services.works`） |
-| `test/` | systemd 入り Ubuntu コンテナでの検証一式 |
+| `test/` | systemd 入り Ubuntu コンテナでの検証と、本番相当のローカル起動 |
 
 3 本のスクリプトは `curl | bash` で単体実行できるよう、互いを `source` しない
 自己完結の構成にしています。ログ出力と health 待機のヘルパが重複するので、
@@ -29,8 +29,12 @@ sudo ./backup.sh --keep 7                                          # バック�
 ## 検証
 
 ```bash
+just preview              # このマシンで nix build 成果物を起動（Vite なし、--dev なし）
 just test-deploy          # = bash test/run.sh all
 ```
 
-Docker Desktop が必要です。初回は nix build に 15〜30 分かかります。
+`just preview` は http://127.0.0.1:18090 で SPA と API を同一オリジン配信します。
+イベントは `preview` / 合言葉 `preview-aikotoba` です。
+
+`just test-deploy` には Docker Desktop が必要です。初回は nix build に 15〜30 分かかります。
 Cloudflare Tunnel の登録だけは本物の token が必要なため、この検証では通していません。

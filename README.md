@@ -53,6 +53,16 @@ just dev
 - PocketBase 管理画面: http://127.0.0.1:8090/_/
 - 開発用管理者: `dev@example.com` / `ncc-hub-dev-admin-pass`（`pb_data` が空のときだけ作成）
 
+本番と同じ成果物で確認するときは `just preview` を使います。
+`nix build` のバイナリが `pb_public` から SPA を配信します。
+`--dev` は付きません。待ち受けは http://127.0.0.1:18090 です。
+
+- イベント: `preview` / 合言葉 `preview-aikotoba`
+- 管理者: `preview@example.com` / `ncc-hub-preview-admin-pass`
+- データ: `server/pb_data_preview/`（`just dev` の `pb_data` とは別）
+
+Linux 上の systemd と `install.sh` の検証は `just test-deploy` です。Docker Desktop が必要です。
+
 別の管理者を足すときは `just superuser <email> <20文字以上のパスワード>` を使います。
 
 ## コマンド一覧
@@ -65,6 +75,7 @@ just dev
 | `just lint` | `golangci-lint` と `svelte-check` を実行します。 |
 | `just test` | Go のユニットテストを実行します。 |
 | `just build` | `nix build .#default` で成果物を生成します。 |
+| `just preview` | 本番成果物をこのマシンで起動します（Vite なし、`--dev` なし）。 |
 | `just backup` | バックアップの取得方法を案内します（本番は `deploy/backup.sh`）。 |
 | `just superuser <email> <password>` | 管理者アカウントを追加します。空の `pb_data` では `just dev` が `dev@example.com` を作ります。 |
 | `just test-deploy` | `deploy/install.sh` を Ubuntu コンテナで検証します。 |

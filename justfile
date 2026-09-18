@@ -13,6 +13,10 @@ dev-web:
 build:
     nix build .#default
 
+# 本番成果物をこのマシンで起動する（Vite なし、--dev なし）
+preview:
+    bash deploy/test/local-serve.sh
+
 lint:
     cd server && golangci-lint run ./...
     cd web && npm run check

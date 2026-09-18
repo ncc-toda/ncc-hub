@@ -503,7 +503,7 @@ func TestPatchWork(t *testing.T) {
 			"Content-Type": okType,
 		},
 		ExpectedStatus:     200,
-		ExpectedContent:    []string{`"description":"新しい説明"`},
+		ExpectedContent:    []string{`"work":`, `"description":"新しい説明"`},
 		NotExpectedContent: []string{"edit_key", "work_code", workCode, "author_name", "田中花子"},
 		TestAppFactory:     factory,
 		AfterTestFunc: func(t testing.TB, app *tests.TestApp, res *http.Response) {
