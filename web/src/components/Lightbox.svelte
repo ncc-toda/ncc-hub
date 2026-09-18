@@ -82,6 +82,11 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    transition: background var(--transition-fast);
+  }
+
+  .lightbox button:hover {
+    background: rgba(255, 255, 255, 0.24);
   }
 
   .close {

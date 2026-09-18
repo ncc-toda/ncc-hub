@@ -950,8 +950,8 @@
   }
 
   .dropzone.drag {
-    border-color: var(--accent);
-    background: color-mix(in srgb, var(--accent) 6%, var(--surface));
+    border-color: var(--color-primary);
+    background: var(--color-primary-subtle);
   }
 
   .thumbs {
@@ -1070,6 +1070,7 @@
   }
 
   .key-display code {
+    font-family: var(--font-mono);
     font-size: 1.05rem;
     font-weight: 700;
     letter-spacing: 0.03em;
@@ -1081,6 +1082,7 @@
   .key-display code.work-code {
     font-size: 1.5rem;
     letter-spacing: 0.12em;
+    color: var(--color-primary-text);
   }
 
   .second-key {

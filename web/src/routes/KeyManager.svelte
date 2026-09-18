@@ -205,6 +205,7 @@
   }
 
   .key-info code {
+    font-family: var(--font-mono);
     word-break: break-all;
     font-size: 0.9rem;
   }
@@ -220,10 +221,11 @@
   }
 
   .code-row .work-code {
+    font-family: var(--font-mono);
     font-size: 1rem;
     font-weight: 700;
     letter-spacing: 0.08em;
-    color: var(--text);
+    color: var(--color-primary-text);
   }
 
   .key-actions {

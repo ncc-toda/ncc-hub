@@ -206,6 +206,12 @@
     font-weight: 400;
     color: var(--muted);
     cursor: pointer;
+    transition: background var(--transition-fast), color var(--transition-fast);
+  }
+
+  .sort-btn:hover:not(.active) {
+    background: var(--fill);
+    color: var(--text);
   }
 
   .sort-btn + .sort-btn {
@@ -213,8 +219,8 @@
   }
 
   .sort-btn.active {
-    background: var(--text);
-    color: var(--bg);
+    background: var(--color-primary);
+    color: var(--color-primary-contrast);
     font-weight: 700;
   }
 

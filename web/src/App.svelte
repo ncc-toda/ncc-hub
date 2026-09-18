@@ -99,9 +99,11 @@
     font-size: 1.05rem;
     letter-spacing: 0.01em;
     color: var(--text);
+    transition: color var(--transition-fast);
   }
 
   .brand:hover {
+    color: var(--color-primary);
     text-decoration: none;
   }
 
@@ -123,6 +125,7 @@
     font-size: 0.85rem;
     font-weight: 700;
     color: var(--muted);
+    transition: color var(--transition-fast);
   }
 
   .keys-link:hover {
@@ -130,7 +133,7 @@
   }
 
   .keys-link.active {
-    color: var(--text);
+    color: var(--color-primary-text);
     text-decoration: underline;
     text-underline-offset: 4px;
   }

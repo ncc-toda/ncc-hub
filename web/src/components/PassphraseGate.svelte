@@ -82,6 +82,7 @@
     flex-direction: column;
     gap: 16px;
     background: var(--bg);
+    box-shadow: var(--shadow-lg);
   }
 
   .gate h2 {

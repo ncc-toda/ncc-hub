@@ -61,6 +61,7 @@
     flex-direction: column;
     overflow: hidden;
     color: inherit;
+    transition: background var(--transition-fast);
   }
 
   .work-card:hover {
@@ -100,13 +101,14 @@
   }
 
   .overlay-badge.video {
-    background: var(--text);
-    color: var(--bg);
+    background: var(--color-secondary);
+    color: var(--color-secondary-contrast);
   }
 
   .overlay-badge.processing {
-    background: var(--bg);
-    color: var(--text);
+    background: var(--color-surface);
+    color: var(--color-warning);
+    border: 1px solid var(--color-warning);
   }
 
   /* タイトルといいね数は同一ベースラインに揃える */

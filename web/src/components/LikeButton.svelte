@@ -76,6 +76,7 @@
     color: var(--text);
     cursor: pointer;
     font-weight: 700;
+    transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
   }
 
   .like-btn:hover {
@@ -85,6 +86,11 @@
   .like-btn.liked {
     color: var(--like);
     border: 1.5px solid var(--like);
+    background: var(--color-primary-subtle);
+  }
+
+  .like-btn.liked:hover {
+    background: var(--color-primary-subtle);
   }
 
   .like-btn:disabled {
