@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
   import { DEV_EVENT_SLUG, isDevFlavor } from './lib/dev';
+  import { getEventKeys } from './lib/keys';
   import { matchRoute, onLinkClick, subscribePath } from './lib/router';
   import EventSelect from './routes/EventSelect.svelte';
   import KeyManager from './routes/KeyManager.svelte';
@@ -9,13 +10,28 @@
   import WorkList from './routes/WorkList.svelte';
 
   const devListHref = `/e/${DEV_EVENT_SLUG}`;
-  let path = $state(location.pathname);
+
+  /** `/` に合言葉があるときは描画前にイベントへ移す。「移動中…」で止めない。 */
+  function pathWithStoredEvent(pathname: string): string {
+    if (matchRoute(pathname).name !== 'home') return pathname;
+    const slugs = Object.keys(getEventKeys());
+    if (slugs.length === 0) return pathname;
+    return `/e/${slugs[slugs.length - 1]}`;
+  }
+
+  const initialPath = pathWithStoredEvent(location.pathname);
+  if (initialPath !== location.pathname) {
+    history.replaceState(null, '', initialPath);
+  }
+  let path = $state(initialPath);
   const route = $derived(matchRoute(path));
 
   // 子の $effect より先に購読する。$effect 内だと初回 navigate を取りこぼす。
   onDestroy(
     subscribePath((next) => {
-      path = next;
+      const resolved = pathWithStoredEvent(next);
+      if (resolved !== next) history.replaceState(null, '', resolved);
+      path = resolved;
       window.scrollTo(0, 0);
     }),
   );

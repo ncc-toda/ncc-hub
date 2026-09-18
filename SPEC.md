@@ -577,6 +577,8 @@ multipart/form-data。ヘッダ `X-Edit-Key` 必須。
 | `/e/:slug/w/:id` | 作品詳細 |
 | `/e/:slug/w/:id/edit` | 編集（編集キーを localStorage に持っている作品のみリンク表示。持っていなくても手入力で入れる） |
 
+`index.html` と SPA fallback は `Cache-Control: no-store` とし、`If-Modified-Since` / `If-None-Match` は無視する。Nix 成果物の mtime が 1970-01-01 のため、`Last-Modified` に頼ると更新後も 304 で古いフロントが残る。ハッシュ付き `/assets/*` は `public, max-age=31536000, immutable`。欠けた asset は `index.html` にフォールバックしない。
+
 **合言葉ゲート**：`X-Event-Key` 未設定、または API が 401 を返したら、全画面モーダルで合言葉入力を求める。成功したら `localStorage.eventKeys[slug]` に保存。
 
 **作品一覧**

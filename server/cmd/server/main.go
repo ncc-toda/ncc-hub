@@ -2,11 +2,9 @@ package main
 
 import (
 	"log"
-	"net/http"
 	"os"
 
 	"github.com/pocketbase/pocketbase"
-	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/plugins/migratecmd"
 	"github.com/pocketbase/pocketbase/tools/hook"
@@ -17,6 +15,7 @@ import (
 	"github.com/ncc-toda/ncc-hub/server/internal/media"
 	_ "github.com/ncc-toda/ncc-hub/server/internal/migrations"
 	"github.com/ncc-toda/ncc-hub/server/internal/upload"
+	"github.com/ncc-toda/ncc-hub/server/internal/webstatic"
 	"github.com/ncc-toda/ncc-hub/server/internal/works"
 )
 
@@ -48,12 +47,7 @@ func main() {
 	app.OnServe().Bind(&hook.Handler[*core.ServeEvent]{
 		Priority: 999,
 		Func: func(se *core.ServeEvent) error {
-			if _, err := os.Stat(publicDir); err == nil {
-				if !se.Router.HasRoute(http.MethodGet, "/{path...}") {
-					se.Router.GET("/{path...}", apis.Static(os.DirFS(publicDir), true)).
-						Bind(apis.Gzip())
-				}
-			}
+			webstatic.Mount(se, publicDir)
 			return se.Next()
 		},
 	})
