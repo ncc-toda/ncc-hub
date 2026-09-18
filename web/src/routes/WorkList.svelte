@@ -23,7 +23,7 @@
 
   const filtered = $derived.by(() => {
     const q = query.trim().toLowerCase();
-    let list = q ? works.filter((w) => w.title.toLowerCase().includes(q)) : works.slice();
+    let list = q ? works.filter((w) => w.description.toLowerCase().includes(q)) : works.slice();
     if (sortBy === 'likes') {
       list = list
         .slice()
@@ -76,9 +76,9 @@
       <input
         type="search"
         class="search"
-        placeholder="タイトルで検索"
+        placeholder="説明文で検索"
         bind:value={query}
-        aria-label="タイトルで検索"
+        aria-label="説明文で検索"
       />
       <nav class="sort" aria-label="並び替え">
         <button

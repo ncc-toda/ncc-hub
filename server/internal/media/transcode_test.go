@@ -51,7 +51,7 @@ func TestTranscodeEndToEnd(t *testing.T) {
 	}
 	work := core.NewRecord(workCol)
 	work.Set("event", ev.Id)
-	work.Set("title", "動画つき作品")
+	work.Set("description", "動画つき作品の説明")
 	work.Set("video_status", "none")
 
 	// 音声なしの1秒テスト動画を生成

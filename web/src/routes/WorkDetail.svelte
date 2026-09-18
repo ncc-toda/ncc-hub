@@ -125,7 +125,6 @@
       <article>
         <header class="work-head">
           <div class="head-text">
-            <h1>{work.title}</h1>
             <p class="posted">投稿日：{formatDate(work.created)}</p>
           </div>
           {#if hasEditKey}
@@ -148,7 +147,9 @@
           <div class="error-box">
             <p>{work.video_error || '動画を変換できませんでした。'}</p>
           </div>
-        {:else if ytId}
+        {/if}
+
+        {#if ytId}
           <div class="yt-wrap">
             <iframe
               src={`https://www.youtube-nocookie.com/embed/${ytId}`}
@@ -159,7 +160,7 @@
             ></iframe>
           </div>
         {:else if work.video_url}
-          <p>
+          <p class="video-link">
             動画：<a href={work.video_url} target="_blank" rel="noopener nofollow">{work.video_url}</a>
           </p>
         {/if}
@@ -186,12 +187,32 @@
           </div>
         {/if}
 
-        {#if work.demo_url}
-          <p class="demo">
-            <a class="btn" href={work.demo_url} target="_blank" rel="noopener nofollow">
-              デモを開く
-            </a>
-          </p>
+        {#if work.demo_url || work.github_url || work.links.length > 0}
+          <div class="links">
+            {#if work.demo_url || work.github_url}
+              <p class="demo">
+                {#if work.demo_url}
+                  <a class="btn" href={work.demo_url} target="_blank" rel="noopener nofollow">
+                    公開ページを開く
+                  </a>
+                {/if}
+                {#if work.github_url}
+                  <a class="btn" href={work.github_url} target="_blank" rel="noopener nofollow">
+                    GitHub を開く
+                  </a>
+                {/if}
+              </p>
+            {/if}
+            {#if work.links.length > 0}
+              <ul class="extra-links">
+                {#each work.links as link (link.url + link.title)}
+                  <li>
+                    <a href={link.url} target="_blank" rel="noopener nofollow">{link.title}</a>
+                  </li>
+                {/each}
+              </ul>
+            {/if}
+          </div>
         {/if}
 
         {#if work.tags.length > 0}
@@ -244,18 +265,13 @@
     margin-bottom: 24px;
   }
 
-  .work-head h1 {
-    margin: 0;
-    font-size: 1.5rem;
-  }
-
   .work-head .btn {
     flex-shrink: 0;
     margin-top: 4px;
   }
 
   .posted {
-    margin: 4px 0 0;
+    margin: 0;
     color: var(--muted);
     font-size: 13px;
   }
@@ -282,6 +298,11 @@
     width: 100%;
     height: 100%;
     border-radius: var(--radius);
+  }
+
+  .video-link {
+    margin: 0 0 24px;
+    word-break: break-all;
   }
 
   .gallery {
@@ -313,7 +334,23 @@
   }
 
   .demo {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0;
+  }
+
+  .links {
     margin: 24px 0;
+  }
+
+  .extra-links {
+    margin: 12px 0 0;
+    padding-left: 1.2em;
+  }
+
+  .extra-links a {
+    word-break: break-all;
   }
 
   .tags {

@@ -8,15 +8,15 @@
 
 ## 1. 目的とスコープ
 
-校内ハッカソン（文化祭の模擬店で使うくじ引きアプリ開発）で、学生が制作物の画像・動画・アピール文を投稿し、他の学生が閲覧・「いいね」できるサイトを作る。
+校内ハッカソン（文化祭の模擬店で使うくじ引きアプリ開発）で、学生が制作物の画像・動画・説明を投稿し、他の学生が閲覧・「いいね」できるサイトを作る。
 
 ### 1.1 満たすべき要件
 
 | # | 要件 | 補足 |
 |---|---|---|
-| R1 | 学生が作品（タイトル・アピール文・画像・動画・デモURL）を投稿・編集・削除できる | アカウント登録なし |
+| R1 | 学生が作品（説明、アピール、画像・動画、公開URL・GitHub・リンク）を投稿・編集・削除できる | アカウント登録なし。タイトルは持たない（テーマが1つに決まっているため） |
 | R2 | 他の学生が作品一覧・詳細を閲覧できる | |
-| R3 | **学生同士では作者が分からない**（匿名） | 先生（管理者）は作者を把握できる |
+| R3 | **サイトは作者を特定する情報を一切保持しない** | 氏名・クラス・連絡先の入力欄を置かない。投稿ごとに発行する作品コード（§8.2）を本人に渡し、誰がどれを投稿したかは本サイトの外（アンケート）で集計する |
 | R4 | 校内・校外どちらからでも投稿・閲覧できる | Cloudflare Tunnel 経由で公開 |
 | R5 | 閲覧・投稿はイベントごとの「合言葉」で制限する | |
 | R6 | 動画は最大 **2GB** までアップロードできる | Cloudflare の 100MB/リクエスト制限を分割アップロードで回避 |
@@ -45,7 +45,8 @@
 | 公開経路 | 学内サーバー → `cloudflared`（Tunnel） → Cloudflare → インターネット | ポート開放・固定IP不要 |
 | アクセス制御 | イベントごとの合言葉（HTTPヘッダ `X-Event-Key`） | |
 | 編集権限 | 投稿時に発行する編集キー（HTTPヘッダ `X-Edit-Key`） | |
-| 匿名性 | 作者情報・編集キーは `work_secrets` コレクションに隔離し、管理者以外読めない | |
+| 匿名性 | 作者情報を保持しない。編集キーと作品コードは `work_secrets` コレクションに隔離し、管理者以外読めない | 保持しなければ漏らしようがない |
+| 作者の突合 | 投稿ごとに作品コード（`XXXX-XXXX`）を発行し、投稿完了画面で本人にだけ表示する | 誰がどれを投稿したかは本サイトの外でアンケートを取り、作品コードで突き合わせる |
 | 動画上限 | 2GB／本、1作品につき1本 | |
 | チャンクサイズ | 20MB | Cloudflare 100MB 制限と PocketBase のデフォルトボディ上限（32MB）の両方に余裕 |
 | 動画変換 | ffmpeg で H.264/AAC mp4、長辺1080p上限、faststart | iPhone の HEVC 対策 |
@@ -281,16 +282,17 @@ PocketBase のコレクション。**Go マイグレーション**（`server/int
 |---|---|---|
 | id | (自動) | |
 | event | relation(events) | 必須、maxSelect 1、cascadeDelete true |
-| title | text | 必須、1〜60文字 |
-| description | text | 任意、最大 10,000文字。Markdown |
+| description | text | **必須**、1〜10,000文字。Markdown。先頭行が一覧・詳細の見出しになる（§9.1） |
 | images | file | maxSelect 10、maxSize 10MB、mimeTypes: image/jpeg, image/png, image/webp, image/gif |
 | video | file | maxSelect 1、maxSize 2147483648。**クライアントは直接書かない**（分割アップロード完了時と変換完了時にサーバーが差し込む） |
 | video_status | select | `none` / `uploading` / `processing` / `ready` / `failed`、既定 `none` |
 | video_error | text | 変換失敗時の短い理由（表示用、技術詳細はログへ） |
 | thumbnail | file | maxSelect 1、サーバーが生成 |
-| video_url | url | 任意。YouTube 等の代替 |
-| demo_url | url | 任意。学内サーバー上の作品本体など |
+| video_url | url | 任意。YouTube 等。アップロード動画と併用できる |
+| demo_url | url | 任意。公開ページ |
+| github_url | url | 任意。ソースコード。ホストは github.com に限定しない |
 | tags | json | 文字列配列、最大10個、各20文字 |
+| links | json | `{title, url}` の配列。最大5件。title は1〜30文字、url は http(s) |
 | like_count | number | 既定 0。`likes` ルートが再集計して更新 |
 | active_upload_id | text | 進行中の分割アップロードID。`hidden: true` |
 | created / updated | autodate | |
@@ -299,14 +301,16 @@ PocketBase のコレクション。**Go マイグレーション**（`server/int
 
 ### 6.3 `work_secrets`（管理者専用）
 
+作品ごとの秘密（編集キーと作品コード）だけを持つ。**氏名・クラス・連絡先など作者を特定する項目は置かない**（§1.1 R3）。
+
 | フィールド | 型 | 制約・備考 |
 |---|---|---|
 | work | relation(works) | 必須、maxSelect 1、cascadeDelete true、**unique index** |
 | edit_key | text | 必須。32文字の英数字（`security.RandomString(32)`） |
-| author_name | text | 必須、1〜60文字。先生だけが見る |
-| author_class | text | 任意、1〜30文字 |
-| author_note | text | 任意。連絡先など |
+| work_code | text | 必須。作品コード。`XXXX-XXXX` 形式（§8.2）。**unique index** |
 | created | autodate | |
+
+インデックス：`work` unique、`work_code` unique
 
 ### 6.4 `reactions`（管理者専用）
 
@@ -420,24 +424,29 @@ multipart/form-data
 
 | フィールド | 必須 | 備考 |
 |---|---|---|
-| title | ○ | |
-| description | | |
-| images[] | | 複数可、合計10枚まで |
-| video_url | | |
-| demo_url | | |
+| description | ○ | 1〜10,000文字 |
+| images[] | △ | 複数可、合計10枚まで |
+| video_url | △ | アップロード動画と排他ではない |
+| video_pending | △ | `"1"` なら、この作成に続けて動画ファイルを分割アップロードする意思表示（§8.5）。作成時点では動画がまだ無いため |
+| demo_url | | 公開URL |
+| github_url | | ホストは github.com に限定しない |
 | tags | | JSON 文字列配列 |
-| author_name | ○ | `work_secrets` へ |
-| author_class | | 同上 |
-| author_note | | 同上 |
+| links | | JSON 文字列。`[{title, url}, ...]`。最大5件 |
+
+△ 印は「`images` / `video_url` / `video_pending=1` のうち少なくとも1つが必要」を意味する（中身の無い投稿を防ぐ）。公開URL・GitHub・その他リンクは中身に数えない。`video_pending` は自己申告なので偽れるが、それで作れるのは空の投稿だけなので v1 では許容する。動画ファイルと `video_url` は排他ではない。
+
+作者を特定する項目は受け取らない。送られてきても無視する。
 
 処理：
 1. `requireEvent` → `requireOpen`
-2. バリデーション（§6.2 の制約）。URL は `http://` / `https://` のみ。
+2. バリデーション（§6.2 の制約）。URL は `http://` / `https://` のみ。`description` が空なら 422。中身条件（上表 △）を満たさなければ 422（`fields.content`）。
 3. `images` の各ファイルについて **ファイル名を `img_<16文字乱数>.<ext>` に付け替える**（元ファイル名に学生名が入っていることがある）。`ext` は MIME から決める（拡張子を信用しない）。
 4. `works` 作成 → 保存。
 5. 保存後、画像ファイルを `exiftool -all= -overwrite_original` で処理（§10.4）。
-6. `edit_key` を生成し `work_secrets` 作成 → 保存。4〜6 は1トランザクション（`app.RunInTransaction`）。
-7. レスポンス `201 { "work": <works record>, "edit_key": "..." }`。**編集キーを返すのはこのときだけ。**
+6. `edit_key`（32文字）と `work_code`（作品コード）を生成し `work_secrets` 作成 → 保存。4〜6 は1トランザクション（`app.RunInTransaction`）。
+7. レスポンス `201 { "work": <works record>, "edit_key": "...", "work_code": "..." }`。**編集キーと作品コードを返すのはこのときだけ。**
+
+**作品コードの生成規則**：`XXXX-XXXX`（英数8文字をハイフンで4文字ずつ区切る）。文字集合は `23456789ABCDEFGHJKMNPQRSTVWXYZ` の30文字。`0/O`・`1/I/L`・`U` を除いてあるのは、紙のアンケートに手で書き写す前提だから。重複したら再生成する（最大5回、それでも衝突したら 500）。
 
 ### 8.3 作品更新 `PATCH /api/x/works/:id`
 
@@ -445,13 +454,17 @@ multipart/form-data。ヘッダ `X-Edit-Key` 必須。
 
 | フィールド | 備考 |
 |---|---|
-| title / description / video_url / demo_url / tags | 送られたものだけ更新 |
+| description / video_url / demo_url / github_url / tags / links | 送られたものだけ更新。`description` は送るなら1文字以上（空にはできない） |
 | images[] | 追加。既存＋追加が10枚を超えたら 422 |
 | images_remove | 削除する既存ファイル名の JSON 配列 |
 | video_remove | `"1"` なら動画・サムネイルを削除し `video_status = none` |
-| author_name / author_class / author_note | `work_secrets` を更新 |
+| video_pending | `"1"` なら、この更新に続けて動画ファイルを差し替える意思表示 |
 
 処理は 8.2 に準じる（`requireEditableWork` を通す）。`video` フィールド本体はこのルートでは受け付けない（送られてきたら 400）。
+
+更新の結果、画像・動画・`video_url` がすべて無くなり `video_pending` も無い場合は 422（作成時と同じ中身条件）。更新後は実際のレコード状態で判定できるので、ここは厳密に検証する。
+
+作品コードと編集キーは更新できない。レスポンスにも含めない。
 
 ### 8.4 作品削除 `DELETE /api/x/works/:id`
 
@@ -543,22 +556,28 @@ multipart/form-data。ヘッダ `X-Edit-Key` 必須。
 **合言葉ゲート**：`X-Event-Key` 未設定、または API が 401 を返したら、全画面モーダルで合言葉入力を求める。成功したら `localStorage.eventKeys[slug]` に保存。
 
 **作品一覧**
-- カードグリッド（モバイル1列、タブレット2列、PC3〜4列）。カード：サムネイル（`thumbnail` → なければ `images[0]` の PocketBase サムネイル `?thumb=600x400` → なければプレースホルダ）、タイトル、いいね数、動画ありバッジ、`video_status` が `processing` なら「変換中」表示。
-- 並び替え：新着順（既定）／いいね順。タイトル検索（クライアント側フィルタで十分。標準APIの `filter` は使わず全件取得。1イベント数百件想定）。
+- カードグリッド（モバイル1列、タブレット2列、PC3〜4列）。カード：サムネイル（`thumbnail` → なければ `images[0]` の PocketBase サムネイル `?thumb=600x400` → なければプレースホルダ）、**見出し**、いいね数、動画ありバッジ、`video_status` が `processing` なら「変換中」表示。
+- **見出し**：タイトル欄が無いので `description` の先頭行から作る。Markdown 記法（`#`、`*`、`` ` ``、リンク等）を落としたプレーンテキストの先頭40文字。空行は読み飛ばす。溢れたら CSS で省略する。
+- 並び替え：新着順（既定）／いいね順。説明文の全文検索（クライアント側フィルタで十分。標準APIの `filter` は使わず全件取得。1イベント数百件想定）。
 - 「投稿する」ボタン。`submissions_open = false` なら非表示にし「受付終了」を表示。
 
 **作品詳細**
+- 見出しは置かない（タイトルが無いため）。投稿日と編集ボタンだけをヘッダに出し、説明文がそのまま本文になる。
 - 画像ギャラリー（タップで拡大）。
-- 動画：`ready` なら `<video controls playsinline preload="metadata" poster={thumbnail}>`。`processing` なら「変換中（数分かかります）」を表示し10秒間隔で再取得。`failed` なら `video_error` を表示。`video_url` があれば埋め込み（YouTube は `youtube-nocookie.com` の iframe、その他はリンク）。
-- アピール文：Markdown → HTML。`marked` ＋ `DOMPurify`。**生HTML禁止、画像記法禁止**、リンクは `http(s)` のみで `rel="noopener nofollow" target="_blank"`。
-- デモURL、タグ、いいねボタン（トグル。連打防止に処理中は disabled）。
+- 動画はファイルと URL を独立して出す。両方あれば上にアップロード動画、下に動画URL。
+- アップロード動画：`ready` なら `<video controls playsinline preload="metadata" poster={thumbnail}>`。`processing` / `uploading` なら「変換中（数分かかります）」を表示し10秒間隔で再取得。`failed` なら `video_error` を表示。
+- 動画URL：ファイルの状態に関わらず表示する（変換失敗時も含む）。YouTube は `youtube-nocookie.com` の iframe、その他はリンク。
+- 説明、アピール：Markdown → HTML。`marked` ＋ `DOMPurify`。**生HTML禁止、画像記法禁止**、リンクは `http(s)` のみで `rel="noopener nofollow" target="_blank"`。
+- 公開URL・GitHubはボタン、その他リンクはタイトル付きの箇条書き。タグ、いいねボタン（トグル。連打防止に処理中は disabled）。
 - 自分の作品（編集キー保持）なら「編集」ボタン。
 
 **投稿／編集フォーム**
-- 項目：タイトル、アピール文（textarea＋プレビュー切替）、画像（ドラッグ＆ドロップ・複数・並び替え不要）、動画（ファイル または URL のどちらか）、デモURL、タグ、作者名・クラス（枠で囲い「**この欄は先生だけが見ます。他の学生には表示されません**」と明記）。
+- 項目：**説明、アピール**（textarea＋プレビュー切替、必須）、画像（ドラッグ＆ドロップ・複数・並び替え不要）、動画（ファイル）、リンク（公開URL・GitHub・動画URLの固定3欄＋その他のリンクを最大5件）、タグ。
+- **作者を入力する欄は置かない**（§1.1 R3）。フォーム冒頭に「個人情報は載せないでください。」と明記する。
+- 説明・画像・動画がすべて空のままでは送信させない（§8.2 の中身条件をクライアントでも検証する）。
 - 画像は選択時にクライアントで処理（§9.2）。
 - 動画ファイルは保存後に分割アップロード開始（§9.4）。フォーム本体の保存と動画は別ステップにし、本文保存 → 編集キー表示 → 動画アップロードの順。
-- 投稿完了時：編集キーを**一度だけ**大きく表示し、コピーボタン、「この画面を閉じると再表示できません。先生に聞けば再発行できます」と注記。同時に `localStorage.editKeys[workId]` に保存。
+- 投稿完了時：**作品コード**と**編集キー**を**一度だけ**大きく表示し、それぞれコピーボタンを付ける。作品コードには「アンケートでこのコードを聞きます。控えておいてください」、編集キーには「この画面を閉じると再表示できません。先生に聞けば再発行できます」と注記。同時に `localStorage.workCodes[workId]` と `localStorage.editKeys[workId]` に保存する。
 - 削除は確認ダイアログ付き。
 
 ### 9.2 画像のクライアント側処理（`lib/image.ts`）
@@ -591,10 +610,11 @@ state: idle → initializing → uploading(progress) → completing → processi
 localStorage["works.deviceId"]        // UUID v4、初回生成
 localStorage["works.eventKeys"]       // { [slug]: passphrase }
 localStorage["works.editKeys"]        // { [workId]: editKey }
+localStorage["works.workCodes"]       // { [workId]: workCode }
 localStorage["works.uploads"]         // { [workId]: { uploadId, size, ext, totalChunks } }
 ```
 
-「編集キーを管理」画面（設定アイコン）から一覧・削除・手入力できる。
+「編集キーを管理」画面（設定アイコン）から一覧・削除・手入力できる。作品コードは同じ画面に読み取り専用で並べて表示し、コピーできるようにする（アンケート記入時に見返せるように）。
 
 ### 9.6 見た目
 
@@ -675,7 +695,8 @@ exiftool -all= -overwrite_original -q <file>...
 
 | 項目 | 対応 |
 |---|---|
-| 作者情報の漏洩 | `work_secrets` は全ルールロック。`works` に作者を示す項目を置かない。ログにも作者名を出さない |
+| 作者情報の漏洩 | **そもそも保持しない**。氏名・クラス・連絡先の入力欄をどのコレクションにも置かない（§1.1 R3）。`work_secrets`（編集キー・作品コード）は全ルールロック |
+| 作品コードからの逆引き | 作品コードは `work_secrets` にあり一般APIからは読めない。本人と先生しか知らない。アンケート結果は本サイトの外で保管する |
 | ファイル名からの推定 | 全ファイルをサーバーで乱数名に付け替え（元名は破棄） |
 | 画像メタデータ | クライアント再エンコード＋サーバー exiftool |
 | 動画メタデータ | ffmpeg 再エンコードで作成日時・端末情報は落ちる。`-map_metadata -1` を追加してタイトル等も落とす |
@@ -685,7 +706,7 @@ exiftool -all= -overwrite_original -q <file>...
 | 合言葉総当たり | レートリミット（§7.4）＋ Cloudflare Rate Limiting。合言葉は8文字以上 |
 | 巨大アップロードでのディスク枯渇 | `max_video_bytes`、空き容量チェック、TTL 掃除、1作品1動画 |
 | 依存の脆弱性 | `npm audit` / `govulncheck` を CI で実行（任意） |
-| 監査ログ | 合言葉不一致・編集キー不一致・作品削除・イベント設定変更を PocketBase の logs に `audit=true` タグ付きで記録（作者名は含めない） |
+| 監査ログ | 合言葉不一致・編集キー不一致・作品削除・イベント設定変更を PocketBase の logs に `audit=true` タグ付きで記録（編集キー・作品コードは含めない） |
 
 ---
 
@@ -816,9 +837,9 @@ works-server は `127.0.0.1` のみで待ち受けるため、ルーターやフ
 
 1. 管理画面 `https://ncchub.ncc-system.jp/_/` にログイン。
 2. `events` に1件作成：`name`「文化祭くじ引きアプリ ハッカソン 2026」、`slug` `fes2026`、`passphrase`（8文字以上、学生に配る）、`max_video_bytes` 2147483648、`submissions_open` true。
-3. 学生に `https://ncchub.ncc-system.jp/e/fes2026` と合言葉を配る。
-4. 作者を確認したいとき：管理画面 → `work_secrets` → `work` で絞り込む。
-5. 編集キーを忘れた学生には `work_secrets.edit_key` を伝える（本人確認は先生の判断）。
+3. 学生に `https://ncchub.ncc-system.jp/e/fes2026` と合言葉を配る。あわせて「投稿後に表示される作品コードを控えること」「投稿内容に名前を書かないこと」を伝える。
+4. 誰がどれを投稿したかを知りたいとき：**本サイトには作者情報が無い**。別途アンケート（フォーム等）で氏名と作品コードを回収し、管理画面 → `work_secrets` → `work_code` で作品を特定する。アンケートの回答は本サイトと分けて保管する。
+5. 編集キーを忘れた学生には `work_secrets.edit_key` を伝える。本人確認は**その学生が作品コードを言えること**を根拠にする（氏名では照合できない）。作品コードも忘れた場合は、投稿内容を本人に説明させて先生が判断する。
 6. 締切後：`submissions_open` を false にする（閲覧・いいねは継続可。いいねも止めたい場合は仕様上 423 になる）。
 7. 不適切な投稿：管理画面から `works` を削除（連鎖で全て消える）。
 8. `events` レコードは削除しない（作品が全部消える）。
@@ -831,7 +852,7 @@ works-server は `127.0.0.1` のみで待ち受けるため、ルーターやフ
 |---|---|---|
 | M1 | flake.nix、justfile、`cmd/server` 骨格、マイグレーション、`just dev` で管理画面が開く | `nix develop` → `just dev` が動く。管理画面に4コレクションがある |
 | M2 | 合言葉ゲート、作品一覧・詳細（テキストのみ） | 合言葉なしで 401、ありで一覧が見える |
-| M3 | 作品作成・更新・削除、画像、編集キー、EXIF 除去 | 投稿→編集キー表示→編集→削除が通る。保存ファイル名が乱数 |
+| M3 | 作品作成・更新・削除、画像、編集キー、作品コード、EXIF 除去 | 投稿→作品コード・編集キー表示→編集→削除が通る。保存ファイル名が乱数 |
 | M4 | 分割アップロード＋変換＋サムネイル＋掃除 cron | 1.5GB の .mov がスマホ回線相当（絞った回線）で完走し、リロード後に再開でき、mp4 になって再生できる |
 | M5 | いいね | トグル・件数・端末ごとの状態復元 |
 | M6 | デプロイ（systemd、cloudflared、Access、レートリミット、バックアップ） | 校外のスマホから投稿・閲覧できる |
@@ -843,7 +864,12 @@ works-server は `127.0.0.1` のみで待ち受けるため、ルーターやフ
 
 - [ ] `X-Event-Key` 無し／誤りで `GET /api/collections/works/records` が 401 になる（正しい値では 200）
 - [ ] `GET /api/collections/work_secrets/records` は正しい合言葉でも 403
-- [ ] `works` のレスポンスに `author_*` が一切含まれない
+- [ ] `works` と `work_secrets` のどちらにも氏名・クラス・連絡先のフィールドが存在しない
+- [ ] `works` のレスポンスに `edit_key` / `work_code` が一切含まれない（作成時の 201 ボディを除く）
+- [ ] 作品コード が `XXXX-XXXX` 形式で、`0` `1` `I` `L` `O` `U` を含まない
+- [ ] 説明が空の投稿、および画像・動画・`video_url` がどれも無い投稿が 422 になる
+- [ ] 動画ファイルと動画URLが両方ある作品で、詳細に両方が表示される
+- [ ] 変換失敗（`video_status = failed`）でも動画URLが表示される
 - [ ] 元ファイル名 `山田太郎_くじ.png` で投稿しても保存名・URLに `山田` が含まれない
 - [ ] GPS 付き JPEG を投稿後、保存ファイルに EXIF が無い（`exiftool` で確認）
 - [ ] 誤った `X-Edit-Key` で PATCH/DELETE が 403

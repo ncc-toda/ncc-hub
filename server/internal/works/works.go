@@ -3,14 +3,17 @@ package works
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"unicode/utf8"
 
 	"github.com/gabriel-vasile/mimetype"
+	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tools/filesystem"
 	"github.com/pocketbase/pocketbase/tools/router"
@@ -62,15 +65,10 @@ func isHTTPURL(s string) bool {
 	return err == nil && (u.Scheme == "http" || u.Scheme == "https") && u.Host != ""
 }
 
-func checkTitle(v string, fields map[string]any) {
-	if n := runeLen(v); n < 1 || n > 60 {
-		fields["title"] = "タイトルは1〜60文字で入力してください"
-	}
-}
-
+// checkDescription は説明・アピールを検証する。作成時は必須、更新時も空にはできない(SPEC §8.2, §8.3)。
 func checkDescription(v string, fields map[string]any) {
-	if runeLen(v) > 10000 {
-		fields["description"] = "アピール文は10,000文字以内で入力してください"
+	if n := runeLen(v); n < 1 || n > 10000 {
+		fields["description"] = "説明、アピールは1〜10,000文字で入力してください"
 	}
 }
 
@@ -99,15 +97,76 @@ func parseTags(raw string, fields map[string]any) []string {
 	return tags
 }
 
-func checkAuthorName(v string, fields map[string]any) {
-	if n := runeLen(v); n < 1 || n > 60 {
-		fields["author_name"] = "作者名は1〜60文字で入力してください"
-	}
+type workLink struct {
+	Title string `json:"title"`
+	URL   string `json:"url"`
 }
 
-func checkAuthorClass(v string, fields map[string]any) {
-	if runeLen(v) > 30 {
-		fields["author_class"] = "クラスは30文字以内で入力してください"
+func parseLinks(raw string, fields map[string]any) []workLink {
+	var links []workLink
+	if err := json.Unmarshal([]byte(raw), &links); err != nil {
+		fields["links"] = "リンクの形式が不正です"
+		return nil
+	}
+	if len(links) > 5 {
+		fields["links"] = "リンクは5件までです"
+		return nil
+	}
+	for i := range links {
+		links[i].Title = strings.TrimSpace(links[i].Title)
+		links[i].URL = strings.TrimSpace(links[i].URL)
+		if links[i].Title == "" || links[i].URL == "" {
+			fields["links"] = "リンクはタイトルとURLの両方を入力してください"
+			return nil
+		}
+		if n := runeLen(links[i].Title); n > 30 {
+			fields["links"] = "リンクのタイトルは1〜30文字で入力してください"
+			return nil
+		}
+		if !isHTTPURL(links[i].URL) {
+			fields["links"] = "リンクは http:// または https:// のURLを入力してください"
+			return nil
+		}
+	}
+	return links
+}
+
+// ---------------------------------------------------------------
+// 作品コード (SPEC §8.2)
+// ---------------------------------------------------------------
+
+// workCodeAlphabet は作品コードに使う文字。紙のアンケートへ書き写す前提なので
+// 紛らわしい 0/O・1/I/L と、語感の事故を避けるため U を除いてある。
+const workCodeAlphabet = "23456789ABCDEFGHJKMNPQRSTVWXYZ"
+
+// newWorkCode は XXXX-XXXX 形式の作品コードを1つ作る。
+func newWorkCode() string {
+	s := security.RandomStringWithAlphabet(8, workCodeAlphabet)
+	return s[:4] + "-" + s[4:]
+}
+
+// generateWorkCode は未使用の作品コードを返す。衝突したら作り直す(最大5回)。
+// work_secrets.work_code の unique index が最終的な保証で、ここは事前の絞り込み。
+func generateWorkCode(app core.App) (string, error) {
+	for range 5 {
+		code := newWorkCode()
+		n, err := app.CountRecords("work_secrets", dbx.HashExp{"work_code": code})
+		if err != nil {
+			return "", err
+		}
+		if n == 0 {
+			return code, nil
+		}
+	}
+	return "", errors.New("work_code: 未使用の作品コードを生成できませんでした")
+}
+
+// checkContent は「中身のある投稿」であることを検証する(SPEC §8.2 の中身条件)。
+// 作成時点では動画ファイルがまだ無いので、続けてアップロードする意思表示として
+// video_pending を受け付ける。自己申告なので偽れるが、作れるのは空の投稿だけ。
+func checkContent(ok bool, fields map[string]any) {
+	if !ok {
+		fields["content"] = "画像か動画のどちらかを必ず入れてください"
 	}
 }
 
@@ -190,24 +249,23 @@ func create(e *core.RequestEvent) error {
 
 	fields := map[string]any{}
 
-	title := value("title")
-	checkTitle(title, fields)
 	description := value("description")
 	checkDescription(description, fields)
 	videoURL := value("video_url")
 	checkURLField("video_url", videoURL, fields)
 	demoURL := value("demo_url")
 	checkURLField("demo_url", demoURL, fields)
+	githubURL := value("github_url")
+	checkURLField("github_url", githubURL, fields)
 
 	var tags []string
 	if raw := value("tags"); raw != "" {
 		tags = parseTags(raw, fields)
 	}
-
-	authorName := value("author_name")
-	checkAuthorName(authorName, fields)
-	authorClass := value("author_class")
-	checkAuthorClass(authorClass, fields)
+	var links []workLink
+	if raw := value("links"); raw != "" {
+		links = parseLinks(raw, fields)
+	}
 
 	images, err := findImages(e)
 	if err != nil {
@@ -218,6 +276,8 @@ func create(e *core.RequestEvent) error {
 	} else if err := randomizeImageNames(images); err != nil {
 		fields["images"] = "対応していない画像形式です(JPEG/PNG/WebP/GIF のみ)"
 	}
+
+	checkContent(len(images) > 0 || videoURL != "" || value("video_pending") == "1", fields)
 
 	if len(fields) > 0 {
 		return validationError(fields)
@@ -234,16 +294,23 @@ func create(e *core.RequestEvent) error {
 
 	record := core.NewRecord(worksCol)
 	editKey := security.RandomString(32)
+	workCode, err := generateWorkCode(e.App)
+	if err != nil {
+		return err
+	}
 
 	// 作品と work_secrets は1トランザクションで作成する(SPEC §8.2 手順6)。
 	txErr := e.App.RunInTransaction(func(tx core.App) error {
 		record.Set("event", ev.Id)
-		record.Set("title", title)
 		record.Set("description", description)
 		record.Set("video_url", videoURL)
 		record.Set("demo_url", demoURL)
+		record.Set("github_url", githubURL)
 		if tags != nil {
 			record.Set("tags", tags)
+		}
+		if links != nil {
+			record.Set("links", links)
 		}
 		record.Set("video_status", "none")
 		record.Set("like_count", 0)
@@ -257,9 +324,7 @@ func create(e *core.RequestEvent) error {
 		secret := core.NewRecord(secretsCol)
 		secret.Set("work", record.Id)
 		secret.Set("edit_key", editKey)
-		secret.Set("author_name", authorName)
-		secret.Set("author_class", authorClass)
-		secret.Set("author_note", value("author_note"))
+		secret.Set("work_code", workCode)
 		return tx.Save(secret)
 	})
 	if txErr != nil {
@@ -269,10 +334,11 @@ func create(e *core.RequestEvent) error {
 	// 保存後に exiftool で EXIF を除去(失敗は警告ログのみ。SPEC §10.4)。
 	media.StripImageMetadata(e.App, record)
 
-	// 編集キーを返すのはこのレスポンスだけ(SPEC §8.2 手順7)。
+	// 編集キーと作品コードを返すのはこのレスポンスだけ(SPEC §8.2 手順7)。
 	return e.JSON(http.StatusCreated, map[string]any{
-		"work":     record,
-		"edit_key": editKey,
+		"work":      record,
+		"edit_key":  editKey,
+		"work_code": workCode,
 	})
 }
 
@@ -288,7 +354,7 @@ func update(e *core.RequestEvent) error {
 	if err := auth.RequireOpen(ev); err != nil {
 		return err
 	}
-	record, secret, err := auth.RequireEditableWork(e, ev, e.Request.PathValue("id"))
+	record, _, err := auth.RequireEditableWork(e, ev, e.Request.PathValue("id"))
 	if err != nil {
 		return err
 	}
@@ -313,10 +379,6 @@ func update(e *core.RequestEvent) error {
 
 	fields := map[string]any{}
 
-	title, hasTitle := present("title")
-	if hasTitle {
-		checkTitle(title, fields)
-	}
 	description, hasDescription := present("description")
 	if hasDescription {
 		checkDescription(description, fields)
@@ -329,21 +391,20 @@ func update(e *core.RequestEvent) error {
 	if hasDemoURL {
 		checkURLField("demo_url", demoURL, fields)
 	}
+	githubURL, hasGithubURL := present("github_url")
+	if hasGithubURL {
+		checkURLField("github_url", githubURL, fields)
+	}
 	var tags []string
 	rawTags, hasTags := present("tags")
 	if hasTags && rawTags != "" {
 		tags = parseTags(rawTags, fields)
 	}
-
-	authorName, hasAuthorName := present("author_name")
-	if hasAuthorName {
-		checkAuthorName(authorName, fields)
+	var links []workLink
+	rawLinks, hasLinks := present("links")
+	if hasLinks && rawLinks != "" {
+		links = parseLinks(rawLinks, fields)
 	}
-	authorClass, hasAuthorClass := present("author_class")
-	if hasAuthorClass {
-		checkAuthorClass(authorClass, fields)
-	}
-	authorNote, hasAuthorNote := present("author_note")
 
 	// 画像の削除指定
 	existing := record.GetStringSlice("images")
@@ -374,17 +435,33 @@ func update(e *core.RequestEvent) error {
 			fields["images"] = "対応していない画像形式です(JPEG/PNG/WebP/GIF のみ)"
 		}
 	}
-	if len(existing)-len(removeNames)+len(newImages) > 10 {
+	imageCount := len(existing) - len(removeNames) + len(newImages)
+	if imageCount > 10 {
 		fields["images"] = "画像は合計10枚までです"
 	}
+
+	// 更新後の状態で中身条件を判定する(SPEC §8.3)。
+	// 作成時と違い実際のレコードを見られるので、ここは厳密に検証できる。
+	videoRemove := false
+	if v, ok := present("video_remove"); ok && v == "1" {
+		videoRemove = true
+	}
+	status := record.GetString("video_status")
+	hasVideo := !videoRemove && (status == "ready" || status == "uploading" || status == "processing")
+	finalVideoURL := record.GetString("video_url")
+	if hasVideoURL {
+		finalVideoURL = videoURL
+	}
+	videoPending := false
+	if v, ok := present("video_pending"); ok && v == "1" {
+		videoPending = true
+	}
+	checkContent(imageCount > 0 || hasVideo || finalVideoURL != "" || videoPending, fields)
 
 	if len(fields) > 0 {
 		return validationError(fields)
 	}
 
-	if hasTitle {
-		record.Set("title", title)
-	}
 	if hasDescription {
 		record.Set("description", description)
 	}
@@ -394,8 +471,14 @@ func update(e *core.RequestEvent) error {
 	if hasDemoURL {
 		record.Set("demo_url", demoURL)
 	}
+	if hasGithubURL {
+		record.Set("github_url", githubURL)
+	}
 	if hasTags {
 		record.Set("tags", tags)
+	}
+	if hasLinks {
+		record.Set("links", links)
 	}
 	if len(removeNames) > 0 {
 		record.Set("images-", removeNames)
@@ -403,38 +486,16 @@ func update(e *core.RequestEvent) error {
 	if len(newImages) > 0 {
 		record.Set("images+", newImages)
 	}
-	if v, ok := present("video_remove"); ok && v == "1" {
+	if videoRemove {
 		record.Set("video", "")
 		record.Set("thumbnail", "")
 		record.Set("video_status", "none")
 		record.Set("video_error", "")
 	}
 
-	secretChanged := false
-	if hasAuthorName {
-		secret.Set("author_name", authorName)
-		secretChanged = true
-	}
-	if hasAuthorClass {
-		secret.Set("author_class", authorClass)
-		secretChanged = true
-	}
-	if hasAuthorNote {
-		secret.Set("author_note", authorNote)
-		secretChanged = true
-	}
-
-	txErr := e.App.RunInTransaction(func(tx core.App) error {
-		if err := tx.Save(record); err != nil {
-			return err
-		}
-		if secretChanged {
-			return tx.Save(secret)
-		}
-		return nil
-	})
-	if txErr != nil {
-		return mapSaveError(txErr)
+	// 作品コード・編集キーは更新できないので work_secrets には触れない(SPEC §8.3)。
+	if err := e.App.Save(record); err != nil {
+		return mapSaveError(err)
 	}
 
 	media.StripImageMetadata(e.App, record)

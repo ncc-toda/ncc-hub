@@ -42,8 +42,7 @@ func InitCollectionsUp(app core.App) error {
 	works := core.NewBaseCollection("works")
 	works.Fields.Add(
 		&core.RelationField{Name: "event", CollectionId: events.Id, Required: true, MaxSelect: 1, CascadeDelete: true},
-		&core.TextField{Name: "title", Required: true, Min: 1, Max: 60},
-		&core.TextField{Name: "description", Max: 10000},
+		&core.TextField{Name: "description", Required: true, Min: 1, Max: 10000},
 		&core.FileField{
 			Name:      "images",
 			MaxSelect: 10,
@@ -57,7 +56,9 @@ func InitCollectionsUp(app core.App) error {
 		&core.FileField{Name: "thumbnail", MaxSelect: 1},
 		&core.URLField{Name: "video_url"},
 		&core.URLField{Name: "demo_url"},
+		&core.URLField{Name: "github_url"},
 		&core.JSONField{Name: "tags"},
+		&core.JSONField{Name: "links"},
 		&core.NumberField{Name: "like_count", OnlyInt: true},
 		&core.TextField{Name: "active_upload_id", Hidden: true},
 		&core.AutodateField{Name: "created", OnCreate: true},
@@ -73,17 +74,17 @@ func InitCollectionsUp(app core.App) error {
 
 	// ---------------------------------------------------------------
 	// work_secrets (§6.3) — 全ルールロック(管理者専用)
+	// 作品ごとの秘密(編集キー・作品コード)だけを持つ。作者を特定する項目は置かない。
 	// ---------------------------------------------------------------
 	secrets := core.NewBaseCollection("work_secrets")
 	secrets.Fields.Add(
 		&core.RelationField{Name: "work", CollectionId: works.Id, Required: true, MaxSelect: 1, CascadeDelete: true},
 		&core.TextField{Name: "edit_key", Required: true},
-		&core.TextField{Name: "author_name", Required: true, Min: 1, Max: 60},
-		&core.TextField{Name: "author_class", Max: 30},
-		&core.TextField{Name: "author_note"},
+		&core.TextField{Name: "work_code", Required: true},
 		&core.AutodateField{Name: "created", OnCreate: true},
 	)
 	secrets.AddIndex("idx_work_secrets_work", true, "`work`", "")
+	secrets.AddIndex("idx_work_secrets_code", true, "`work_code`", "")
 	if err := app.Save(secrets); err != nil {
 		return err
 	}

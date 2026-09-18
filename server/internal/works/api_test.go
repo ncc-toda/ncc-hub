@@ -31,6 +31,7 @@ const (
 	eventID    = "evt000000000001"
 	workID     = "wrk000000000001"
 	editKey    = "editkey0123456789abcdefghijklmno" // 32文字
+	workCode   = "AAAA-2222"                        // 作品コード(SPEC §8.2)
 	uploadID   = "up0000000000000000000001"         // 24文字
 	deviceID   = "12345678-1234-4123-8123-123456789012"
 )
@@ -91,7 +92,9 @@ func seedWork(t testing.TB, app core.App) *core.Record {
 	r := core.NewRecord(col)
 	r.Set("id", workID)
 	r.Set("event", eventID)
-	r.Set("title", "既存の作品")
+	r.Set("description", "既存の作品の説明")
+	// 中身条件(SPEC §8.3)を満たすため、動画URLを持たせておく。
+	r.Set("video_url", "https://example.com/seed")
 	r.Set("video_status", "none")
 	r.Set("like_count", 0)
 	if err := app.Save(r); err != nil {
@@ -105,7 +108,7 @@ func seedWork(t testing.TB, app core.App) *core.Record {
 	s := core.NewRecord(secCol)
 	s.Set("work", workID)
 	s.Set("edit_key", editKey)
-	s.Set("author_name", "山田太郎")
+	s.Set("work_code", workCode)
 	if err := app.Save(s); err != nil {
 		t.Fatal(err)
 	}
@@ -208,9 +211,9 @@ func TestWorksListRequiresEventKey(t *testing.T) {
 		URL:             "/api/collections/works/records",
 		Headers:         map[string]string{"X-Event-Key": passphrase},
 		ExpectedStatus:  200,
-		ExpectedContent: []string{`"既存の作品"`, fmt.Sprintf("%q", workID)},
+		ExpectedContent: []string{`"既存の作品の説明"`, fmt.Sprintf("%q", workID)},
 		NotExpectedContent: []string{
-			"author_name", "edit_key", "active_upload_id", "山田",
+			"edit_key", "work_code", workCode, "active_upload_id",
 		},
 		TestAppFactory: factory,
 	}).Test(t)
@@ -249,15 +252,17 @@ func TestCreateWork(t *testing.T) {
 	}
 
 	body, contentType := multipartBody(t, map[string]string{
-		"title":       "すごい作品",
-		"description": "アピール文です",
+		"description": "すごい作品の説明です",
 		"tags":        `["くじ引き","Svelte"]`,
 		"demo_url":    "https://example.com/demo",
+		"github_url":  "https://github.com/ncc/demo",
+		"links":       `[{"title":"デザイン資料","url":"https://example.com/design"}]`,
+		// 作者を特定する項目は受け取らない。送っても無視されることを確かめる。
 		"author_name": "山田太郎",
 	}, "images", "山田太郎_くじ.png", pngBytes(t))
 
 	(&tests.ApiScenario{
-		Name:   "作成成功で 201 + edit_key、作者情報は含まれない",
+		Name:   "作成成功で 201 + edit_key + work_code、作者情報は保存されない",
 		Method: http.MethodPost,
 		URL:    "/api/x/works",
 		Body:   body,
@@ -265,12 +270,16 @@ func TestCreateWork(t *testing.T) {
 			"X-Event-Key":  passphrase,
 			"Content-Type": contentType,
 		},
-		ExpectedStatus:     201,
-		ExpectedContent:    []string{`"edit_key":"`, `"title":"すごい作品"`, `"video_status":"none"`},
+		ExpectedStatus: 201,
+		ExpectedContent: []string{
+			`"edit_key":"`, `"work_code":"`,
+			`"description":"すごい作品の説明です"`, `"video_status":"none"`,
+			`"github_url":"https://github.com/ncc/demo"`, `"デザイン資料"`,
+		},
 		NotExpectedContent: []string{"author_name", "山田太郎", "active_upload_id"},
 		TestAppFactory:     factory,
 		AfterTestFunc: func(t testing.TB, app *tests.TestApp, res *http.Response) {
-			work, err := app.FindFirstRecordByFilter("works", "title = 'すごい作品'")
+			work, err := app.FindFirstRecordByFilter("works", "description = 'すごい作品の説明です'")
 			if err != nil {
 				t.Fatalf("作成された作品が見つかりません: %v", err)
 			}
@@ -289,23 +298,43 @@ func TestCreateWork(t *testing.T) {
 			if err != nil {
 				t.Fatalf("work_secrets が作成されていません: %v", err)
 			}
-			if secret.GetString("author_name") != "山田太郎" {
-				t.Fatal("author_name が保存されていません")
-			}
 			if len(secret.GetString("edit_key")) != 32 {
 				t.Fatal("edit_key が32文字ではありません")
+			}
+			code := secret.GetString("work_code")
+			if !regexp.MustCompile(`^[23456789ABCDEFGHJKMNPQRSTVWXYZ]{4}-[23456789ABCDEFGHJKMNPQRSTVWXYZ]{4}$`).MatchString(code) {
+				t.Fatalf("作品コードの形式が不正です: %s", code)
+			}
+			if secret.Get("author_name") != nil {
+				t.Fatal("work_secrets に author_name が残っています")
+			}
+			if work.GetString("github_url") != "https://github.com/ncc/demo" {
+				t.Fatalf("github_url が保存されていません: %s", work.GetString("github_url"))
+			}
+			raw, err := json.Marshal(work.Get("links"))
+			if err != nil {
+				t.Fatalf("links の読み出しに失敗: %v", err)
+			}
+			var saved []struct {
+				Title string `json:"title"`
+				URL   string `json:"url"`
+			}
+			if err := json.Unmarshal(raw, &saved); err != nil {
+				t.Fatalf("links の JSON が不正です: %s", raw)
+			}
+			if len(saved) != 1 || saved[0].Title != "デザイン資料" || saved[0].URL != "https://example.com/design" {
+				t.Fatalf("links の値が不正です: %+v", saved)
 			}
 		},
 	}).Test(t)
 
 	invalidBody, invalidType := multipartBody(t, map[string]string{
-		"title":       "",
-		"author_name": "",
+		"description": "",
 		"demo_url":    "ftp://example.com",
 	}, "", "", nil)
 
 	(&tests.ApiScenario{
-		Name:   "バリデーション失敗は 422 + fields",
+		Name:   "説明なし・中身なし・不正URLは 422 + fields",
 		Method: http.MethodPost,
 		URL:    "/api/x/works",
 		Body:   invalidBody,
@@ -314,9 +343,96 @@ func TestCreateWork(t *testing.T) {
 			"Content-Type": invalidType,
 		},
 		ExpectedStatus:  422,
-		ExpectedContent: []string{`"code":"validation"`, `"title"`, `"author_name"`, `"demo_url"`},
+		ExpectedContent: []string{`"code":"validation"`, `"description"`, `"content"`, `"demo_url"`},
 		TestAppFactory:  factory,
 	}).Test(t)
+
+	noContentBody, noContentType := multipartBody(t, map[string]string{
+		"description": "説明だけあって画像も動画もない",
+	}, "", "", nil)
+
+	(&tests.ApiScenario{
+		Name:   "画像も動画もない投稿は 422",
+		Method: http.MethodPost,
+		URL:    "/api/x/works",
+		Body:   noContentBody,
+		Headers: map[string]string{
+			"X-Event-Key":  passphrase,
+			"Content-Type": noContentType,
+		},
+		ExpectedStatus:  422,
+		ExpectedContent: []string{`"content"`},
+		TestAppFactory:  factory,
+	}).Test(t)
+
+	pendingBody, pendingType := multipartBody(t, map[string]string{
+		"description":   "動画をこれからアップロードする",
+		"video_pending": "1",
+	}, "", "", nil)
+
+	(&tests.ApiScenario{
+		Name:   "video_pending=1 なら画像なしでも作成できる",
+		Method: http.MethodPost,
+		URL:    "/api/x/works",
+		Body:   pendingBody,
+		Headers: map[string]string{
+			"X-Event-Key":  passphrase,
+			"Content-Type": pendingType,
+		},
+		ExpectedStatus:  201,
+		ExpectedContent: []string{`"work_code":"`},
+		TestAppFactory:  factory,
+	}).Test(t)
+
+	badGithubBody, badGithubType := multipartBody(t, map[string]string{
+		"description":   "説明",
+		"video_pending": "1",
+		"github_url":    "ftp://example.com",
+	}, "", "", nil)
+	(&tests.ApiScenario{
+		Name:   "github_url が http(s) 以外なら 422",
+		Method: http.MethodPost,
+		URL:    "/api/x/works",
+		Body:   badGithubBody,
+		Headers: map[string]string{
+			"X-Event-Key":  passphrase,
+			"Content-Type": badGithubType,
+		},
+		ExpectedStatus:  422,
+		ExpectedContent: []string{`"github_url"`},
+		TestAppFactory:  factory,
+	}).Test(t)
+
+	linkCases := []struct {
+		name string
+		raw  string
+	}{
+		{"JSON不正", `{`},
+		{"6件", `[{"title":"a","url":"https://a.example"},{"title":"b","url":"https://b.example"},{"title":"c","url":"https://c.example"},{"title":"d","url":"https://d.example"},{"title":"e","url":"https://e.example"},{"title":"f","url":"https://f.example"}]`},
+		{"title空", `[{"title":"","url":"https://example.com"}]`},
+		{"title31文字", `[{"title":"あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほま","url":"https://example.com"}]`},
+		{"ftp", `[{"title":"資料","url":"ftp://example.com"}]`},
+	}
+	for _, tc := range linkCases {
+		linkBody, linkType := multipartBody(t, map[string]string{
+			"description":   "説明",
+			"video_pending": "1",
+			"links":         tc.raw,
+		}, "", "", nil)
+		(&tests.ApiScenario{
+			Name:   "links 異常系: " + tc.name,
+			Method: http.MethodPost,
+			URL:    "/api/x/works",
+			Body:   linkBody,
+			Headers: map[string]string{
+				"X-Event-Key":  passphrase,
+				"Content-Type": linkType,
+			},
+			ExpectedStatus:  422,
+			ExpectedContent: []string{`"links"`},
+			TestAppFactory:  factory,
+		}).Test(t)
+	}
 
 	closedFactory := func(t testing.TB) *tests.TestApp {
 		app := newApp(t)
@@ -324,8 +440,8 @@ func TestCreateWork(t *testing.T) {
 		return app
 	}
 	closedBody, closedType := multipartBody(t, map[string]string{
-		"title":       "作品",
-		"author_name": "山田",
+		"description":   "作品の説明",
+		"video_pending": "1",
 	}, "", "", nil)
 
 	(&tests.ApiScenario{
@@ -355,7 +471,7 @@ func TestPatchWork(t *testing.T) {
 		return app
 	}
 
-	wrongKeyBody, wrongKeyType := multipartBody(t, map[string]string{"title": "改ざん"}, "", "", nil)
+	wrongKeyBody, wrongKeyType := multipartBody(t, map[string]string{"description": "改ざん"}, "", "", nil)
 	(&tests.ApiScenario{
 		Name:   "誤った編集キーで PATCH は 403",
 		Method: http.MethodPatch,
@@ -372,7 +488,8 @@ func TestPatchWork(t *testing.T) {
 	}).Test(t)
 
 	okBody, okType := multipartBody(t, map[string]string{
-		"title":       "新タイトル",
+		"description": "新しい説明",
+		// 作者を特定する項目は受け取らない。
 		"author_name": "田中花子",
 	}, "", "", nil)
 	(&tests.ApiScenario{
@@ -386,18 +503,53 @@ func TestPatchWork(t *testing.T) {
 			"Content-Type": okType,
 		},
 		ExpectedStatus:     200,
-		ExpectedContent:    []string{`"title":"新タイトル"`},
-		NotExpectedContent: []string{"edit_key", "author_name", "田中花子"},
+		ExpectedContent:    []string{`"description":"新しい説明"`},
+		NotExpectedContent: []string{"edit_key", "work_code", workCode, "author_name", "田中花子"},
 		TestAppFactory:     factory,
 		AfterTestFunc: func(t testing.TB, app *tests.TestApp, res *http.Response) {
 			secret, err := app.FindFirstRecordByFilter("work_secrets", "work = {:w}", dbx.Params{"w": workID})
 			if err != nil {
 				t.Fatal(err)
 			}
-			if secret.GetString("author_name") != "田中花子" {
-				t.Fatal("work_secrets の author_name が更新されていません")
+			if secret.GetString("work_code") != workCode {
+				t.Fatal("作品コードが書き換わっています")
+			}
+			if secret.Get("author_name") != nil {
+				t.Fatal("work_secrets に author_name が残っています")
 			}
 		},
+	}).Test(t)
+
+	emptyDescBody, emptyDescType := multipartBody(t, map[string]string{"description": ""}, "", "", nil)
+	(&tests.ApiScenario{
+		Name:   "説明を空にする PATCH は 422",
+		Method: http.MethodPatch,
+		URL:    "/api/x/works/" + workID,
+		Body:   emptyDescBody,
+		Headers: map[string]string{
+			"X-Event-Key":  passphrase,
+			"X-Edit-Key":   editKey,
+			"Content-Type": emptyDescType,
+		},
+		ExpectedStatus:  422,
+		ExpectedContent: []string{`"description"`},
+		TestAppFactory:  factory,
+	}).Test(t)
+
+	stripBody, stripType := multipartBody(t, map[string]string{"video_url": ""}, "", "", nil)
+	(&tests.ApiScenario{
+		Name:   "画像も動画も無くなる PATCH は 422",
+		Method: http.MethodPatch,
+		URL:    "/api/x/works/" + workID,
+		Body:   stripBody,
+		Headers: map[string]string{
+			"X-Event-Key":  passphrase,
+			"X-Edit-Key":   editKey,
+			"Content-Type": stripType,
+		},
+		ExpectedStatus:  422,
+		ExpectedContent: []string{`"content"`},
+		TestAppFactory:  factory,
 	}).Test(t)
 
 	videoBody, videoType := multipartBody(t, map[string]string{}, "video", "movie.mp4", []byte("fake"))
@@ -414,6 +566,46 @@ func TestPatchWork(t *testing.T) {
 		ExpectedStatus:  400,
 		ExpectedContent: []string{`"bad_request"`},
 		TestAppFactory:  factory,
+	}).Test(t)
+
+	readyFactory := func(t testing.TB) *tests.TestApp {
+		app := newApp(t)
+		seedEvent(t, app, true)
+		w := seedWork(t, app)
+		w.Set("video_status", "ready")
+		if err := app.Save(w); err != nil {
+			t.Fatal(err)
+		}
+		return app
+	}
+	bothBody, bothType := multipartBody(t, map[string]string{
+		"video_url": "https://youtu.be/abcdefghijk",
+	}, "", "", nil)
+	(&tests.ApiScenario{
+		Name:   "動画ファイルと video_url は併存できる",
+		Method: http.MethodPatch,
+		URL:    "/api/x/works/" + workID,
+		Body:   bothBody,
+		Headers: map[string]string{
+			"X-Event-Key":  passphrase,
+			"X-Edit-Key":   editKey,
+			"Content-Type": bothType,
+		},
+		ExpectedStatus:  200,
+		ExpectedContent: []string{`"video_url":"https://youtu.be/abcdefghijk"`, `"video_status":"ready"`},
+		TestAppFactory:  readyFactory,
+		AfterTestFunc: func(t testing.TB, app *tests.TestApp, res *http.Response) {
+			work, err := app.FindRecordById("works", workID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if work.GetString("video_status") != "ready" {
+				t.Fatal("video_status が ready のまま残っていません")
+			}
+			if work.GetString("video_url") != "https://youtu.be/abcdefghijk" {
+				t.Fatal("video_url が保存されていません")
+			}
+		},
 	}).Test(t)
 }
 
@@ -853,7 +1045,7 @@ func TestLikeToggle(t *testing.T) {
 
 func TestLikesList(t *testing.T) {
 	(&tests.ApiScenario{
-		Name:   "いいね済み作品IDの一覧",
+		Name:   "いいね済み作品コードの一覧",
 		Method: http.MethodGet,
 		URL:    "/api/x/likes?event=" + eventID,
 		Headers: map[string]string{

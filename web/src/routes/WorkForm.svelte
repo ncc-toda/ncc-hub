@@ -11,6 +11,7 @@
     updateWork,
     videoCancel,
     type EventRecord,
+    type WorkLink,
     type WorkRecord,
   } from '../lib/api';
   import { copyText } from '../lib/clipboard';
@@ -22,7 +23,9 @@
     getUpload,
     removeEditKey,
     removeUpload,
+    removeWorkCode,
     setEditKey,
+    setWorkCode,
     type StoredUpload,
   } from '../lib/keys';
   import { renderMarkdown } from '../lib/markdown';
@@ -47,17 +50,14 @@
   let loadError = $state('');
 
   // --- フォーム項目 ---
-  let title = $state('');
   let description = $state('');
   let showPreview = $state(false);
-  let videoMode = $state<'file' | 'url'>('file');
   let videoFile = $state<File | null>(null);
   let videoUrl = $state('');
   let demoUrl = $state('');
+  let githubUrl = $state('');
   let tagsText = $state('');
-  let authorName = $state('');
-  let authorClass = $state('');
-  let authorNote = $state('');
+  let links = $state<WorkLink[]>([]);
 
   interface NewImage {
     file: File;
@@ -85,8 +85,9 @@
   // svelte-ignore state_referenced_locally
   let workId = $state(id);
   let createdKey = $state('');
-  let copied = $state(false);
-  let copyFailed = $state(false);
+  let createdCode = $state('');
+  let copiedField = $state<'code' | 'key' | ''>('');
+  let copyFailedField = $state<'code' | 'key' | ''>('');
 
   let uploader: VideoUploader | null = null;
   let uploadSnap = $state<UploadSnapshot>({ phase: 'idle', sentBytes: 0, totalBytes: 0, error: '' });
@@ -123,12 +124,12 @@
     try {
       const w = await getWork(slug, id);
       work = w;
-      title = w.title;
       description = w.description;
       videoUrl = w.video_url;
       demoUrl = w.demo_url;
+      githubUrl = w.github_url;
       tagsText = w.tags.join(', ');
-      videoMode = w.video_url && w.video_status === 'none' ? 'url' : 'file';
+      links = w.links.map((l) => ({ title: l.title, url: l.url }));
       existingImages = w.images.map((name) => ({ name, removed: false }));
       pendingResume = getUpload(id);
       step = 'form';
@@ -245,30 +246,64 @@
     return tags;
   }
 
+  function addLink() {
+    if (links.length >= 5) return;
+    links.push({ title: '', url: '' });
+  }
+
+  function removeLink(i: number) {
+    links.splice(i, 1);
+  }
+
   function validate(): FormData | null {
     fieldErrors = {};
     formError = '';
 
-    const t = title.trim();
-    if (!t) fieldErrors['title'] = 'タイトルを入力してください';
-    else if (t.length > 60) fieldErrors['title'] = 'タイトルは60文字以内です';
-
-    if (description.length > 10000) fieldErrors['description'] = 'アピール文は10,000文字以内です';
+    const desc = description.trim();
+    if (!desc) fieldErrors['description'] = '説明、アピールを入力してください';
+    else if (desc.length > 10000) fieldErrors['description'] = '説明、アピールは10,000文字以内です';
 
     const urlOk = (u: string) => !u || /^https?:\/\//.test(u);
-    // 動画は「どちらか一方」: ファイルモードでは外部URLを持ち越さない
-    const vUrl = videoMode === 'url' ? videoUrl.trim() : '';
+    const vUrl = videoUrl.trim();
     if (!urlOk(vUrl)) fieldErrors['video_url'] = 'http:// または https:// のURLを入力してください';
     const dUrl = demoUrl.trim();
     if (!urlOk(dUrl)) fieldErrors['demo_url'] = 'http:// または https:// のURLを入力してください';
+    const gUrl = githubUrl.trim();
+    if (!urlOk(gUrl)) fieldErrors['github_url'] = 'http:// または https:// のURLを入力してください';
 
     const tags = parseTags();
 
-    if (!isEdit && !authorName.trim()) fieldErrors['author_name'] = '作者名を入力してください';
-    if (authorName.trim().length > 60) fieldErrors['author_name'] = '作者名は60文字以内です';
-    if (authorClass.trim().length > 30) fieldErrors['author_class'] = 'クラスは30文字以内です';
-
     if (activeImageCount > 10) fieldErrors['images'] = '画像は10枚までです';
+
+    const cleanedLinks: WorkLink[] = [];
+    for (const l of links) {
+      const title = l.title.trim();
+      const url = l.url.trim();
+      if (!title && !url) continue;
+      if (!title || !url) {
+        fieldErrors['links'] = 'リンクはタイトルとURLの両方を入力してください';
+        break;
+      }
+      if (title.length > 30) {
+        fieldErrors['links'] = 'リンクのタイトルは1〜30文字で入力してください';
+        break;
+      }
+      if (!urlOk(url)) {
+        fieldErrors['links'] = 'リンクは http:// または https:// のURLを入力してください';
+        break;
+      }
+      cleanedLinks.push({ title, url });
+    }
+    if (cleanedLinks.length > 5) fieldErrors['links'] = 'リンクは5件までです';
+
+    // 中身条件（SPEC §8.2）：画像・動画のどちらかは必ず要る。
+    // 動画ファイルは保存後にアップロードするので、ここでは video_pending として申告する。
+    const videoPending = !!videoFile;
+    const keepsVideo =
+      isEdit && !videoRemove && !!work && work.video_status !== 'none';
+    if (!videoPending && !keepsVideo && activeImageCount === 0 && !vUrl) {
+      fieldErrors['content'] = '画像か動画のどちらかを必ず入れてください';
+    }
 
     if (tags === null || Object.keys(fieldErrors).some((k) => fieldErrors[k])) {
       // 項目別エラーが出ているときは下部バナーを重ねない
@@ -277,24 +312,19 @@
     }
 
     const fd = new FormData();
-    fd.set('title', t);
-    fd.set('description', description);
+    fd.set('description', desc);
     fd.set('video_url', vUrl);
     fd.set('demo_url', dUrl);
+    fd.set('github_url', gUrl);
     fd.set('tags', JSON.stringify(tags));
+    fd.set('links', JSON.stringify(cleanedLinks));
+    if (videoPending) fd.set('video_pending', '1');
     for (const img of newImages) fd.append('images', img.file, img.file.name);
 
     if (isEdit) {
       const remove = existingImages.filter((i) => i.removed).map((i) => i.name);
       if (remove.length > 0) fd.set('images_remove', JSON.stringify(remove));
       if (videoRemove) fd.set('video_remove', '1');
-      if (authorName.trim()) fd.set('author_name', authorName.trim());
-      if (authorClass.trim()) fd.set('author_class', authorClass.trim());
-      if (authorNote.trim()) fd.set('author_note', authorNote.trim());
-    } else {
-      fd.set('author_name', authorName.trim());
-      if (authorClass.trim()) fd.set('author_class', authorClass.trim());
-      if (authorNote.trim()) fd.set('author_note', authorNote.trim());
     }
     return fd;
   }
@@ -342,7 +372,7 @@
         const r = await updateWork(slug, id, editKey, fd);
         work = r.work;
         setEditKey(id, editKey);
-        if (videoMode === 'file' && videoFile) {
+        if (videoFile) {
           void startUpload(videoFile, null);
         } else {
           navigate(`/e/${slug}/w/${id}`);
@@ -351,8 +381,10 @@
         const r = await createWork(slug, fd);
         workId = r.work.id;
         createdKey = r.edit_key;
+        createdCode = r.work_code;
         editKey = r.edit_key;
         setEditKey(workId, r.edit_key);
+        setWorkCode(workId, r.work_code);
         step = 'editkey';
         window.scrollTo(0, 0);
       }
@@ -371,6 +403,7 @@
     try {
       await deleteWork(slug, id, editKey);
       removeEditKey(id);
+      removeWorkCode(id);
       removeUpload(id);
       navigate(`/e/${slug}`);
     } catch (err) {
@@ -379,13 +412,13 @@
     }
   }
 
-  async function copyKey() {
-    copyFailed = false;
-    if (await copyText(createdKey)) {
-      copied = true;
-      setTimeout(() => (copied = false), 2000);
+  async function copy(field: 'code' | 'key') {
+    copyFailedField = '';
+    if (await copyText(field === 'code' ? createdCode : createdKey)) {
+      copiedField = field;
+      setTimeout(() => (copiedField = ''), 2000);
     } else {
-      copyFailed = true;
+      copyFailedField = field;
     }
   }
 
@@ -538,15 +571,13 @@
         {/if}
 
         <form class="main-form" onsubmit={submit} novalidate>
-          <div class="field">
-            <label for="f-title">タイトル <span class="req">必須</span></label>
-            <input id="f-title" type="text" bind:value={title} maxlength="60" />
-            {#if fieldErrors['title']}<p class="error-text">{fieldErrors['title']}</p>{/if}
+          <div class="notice-box privacy-note">
+            個人情報は載せないでください。
           </div>
 
           <div class="field">
             <div class="label-row">
-              <label for="f-desc">アピール文（Markdown可）</label>
+              <label for="f-desc">説明、アピール（Markdown可） <span class="req">必須</span></label>
               <button type="button" class="btn btn-sm" onclick={() => (showPreview = !showPreview)}>
                 {showPreview ? '編集に戻る' : 'プレビュー'}
               </button>
@@ -565,6 +596,10 @@
             {/if}
             {#if fieldErrors['description']}<p class="error-text">{fieldErrors['description']}</p>{/if}
           </div>
+
+          {#if fieldErrors['content']}
+            <p class="error-text">{fieldErrors['content']}</p>
+          {/if}
 
           <div class="field">
             <span class="label">画像（最大10枚）</span>
@@ -625,73 +660,54 @@
           </div>
 
           <div class="field">
-            <span class="label">動画（どちらか一方）</span>
-            <div class="video-mode">
-              <label class="radio">
-                <input type="radio" bind:group={videoMode} value="file" />
-                ファイルをアップロード
-              </label>
-              <label class="radio">
-                <input type="radio" bind:group={videoMode} value="url" />
-                外部URL（YouTubeなど）
+            <span class="label">動画</span>
+            {#if isEdit && work && work.video_status !== 'none' && !videoRemove}
+              <div class="current-video">
+                <p class="hint">
+                  現在の動画：{work.video_status === 'ready'
+                    ? 'あり（再生可能）'
+                    : work.video_status === 'failed'
+                      ? '変換に失敗'
+                      : '変換中'}
+                </p>
+                <button type="button" class="btn btn-sm btn-danger" onclick={() => (videoRemove = true)}>
+                  動画を削除する
+                </button>
+              </div>
+            {:else if videoRemove}
+              <div class="notice-box">
+                保存すると動画を削除します。
+                <button type="button" class="btn btn-sm" onclick={() => (videoRemove = false)}>
+                  取り消す
+                </button>
+              </div>
+            {/if}
+            <div class="video-pick">
+              <label class="btn btn-sm" class:disabled={!!pendingResume}>
+                動画を選ぶ
+                <input
+                  type="file"
+                  accept="video/*,.mov,.mkv,.avi,.m4v"
+                  hidden
+                  onchange={onVideoPick}
+                  disabled={!!pendingResume}
+                />
               </label>
             </div>
-            {#if videoMode === 'file'}
-              {#if isEdit && work && work.video_status !== 'none' && !videoRemove}
-                <div class="current-video">
-                  <p class="hint">
-                    現在の動画：{work.video_status === 'ready'
-                      ? 'あり（再生可能）'
-                      : work.video_status === 'failed'
-                        ? '変換に失敗'
-                        : '変換中'}
-                  </p>
-                  <button type="button" class="btn btn-sm btn-danger" onclick={() => (videoRemove = true)}>
-                    動画を削除する
-                  </button>
-                </div>
-              {:else if videoRemove}
-                <div class="notice-box">
-                  保存すると動画を削除します。
-                  <button type="button" class="btn btn-sm" onclick={() => (videoRemove = false)}>
-                    取り消す
-                  </button>
-                </div>
-              {/if}
-              <div class="video-pick">
-                <label class="btn btn-sm" class:disabled={!!pendingResume}>
-                  動画を選ぶ
-                  <input
-                    type="file"
-                    accept="video/*,.mov,.mkv,.avi,.m4v"
-                    hidden
-                    onchange={onVideoPick}
-                    disabled={!!pendingResume}
-                  />
-                </label>
-              </div>
-              {#if event}
-                <p class="hint">
-                  最大 {formatGB(event.max_video_bytes)}。{isEdit
-                    ? '保存後にアップロードが始まります。'
-                    : '投稿の保存が終わってからアップロードが始まります。'}
-                </p>
-              {/if}
-              {#if videoFile}<p class="hint">選択中：{videoFile.name}</p>{/if}
-              {#if fieldErrors['video']}<p class="error-text">{fieldErrors['video']}</p>{/if}
-            {:else}
-              <input
-                type="url"
-                bind:value={videoUrl}
-                placeholder="https://www.youtube.com/watch?v=..."
-                inputmode="url"
-              />
-              {#if fieldErrors['video_url']}<p class="error-text">{fieldErrors['video_url']}</p>{/if}
+            {#if event}
+              <p class="hint">
+                最大 {formatGB(event.max_video_bytes)}。{isEdit
+                  ? '保存後にアップロードが始まります。'
+                  : '投稿の保存が終わってからアップロードが始まります。'}
+              </p>
             {/if}
+            {#if videoFile}<p class="hint">選択中：{videoFile.name}</p>{/if}
+            {#if fieldErrors['video']}<p class="error-text">{fieldErrors['video']}</p>{/if}
           </div>
 
-          <div class="field">
-            <label for="f-demo">デモURL</label>
+          <div class="field links-block">
+            <span class="label">リンク</span>
+            <label for="f-demo">公開URL</label>
             <input
               id="f-demo"
               type="url"
@@ -700,6 +716,59 @@
               inputmode="url"
             />
             {#if fieldErrors['demo_url']}<p class="error-text">{fieldErrors['demo_url']}</p>{/if}
+
+            <label for="f-github">GitHub</label>
+            <input
+              id="f-github"
+              type="url"
+              bind:value={githubUrl}
+              placeholder="https://github.com/..."
+              inputmode="url"
+            />
+            {#if fieldErrors['github_url']}<p class="error-text">{fieldErrors['github_url']}</p>{/if}
+
+            <label for="f-vurl">動画URL</label>
+            <input
+              id="f-vurl"
+              type="url"
+              bind:value={videoUrl}
+              placeholder="https://www.youtube.com/watch?v=..."
+              inputmode="url"
+            />
+            {#if fieldErrors['video_url']}<p class="error-text">{fieldErrors['video_url']}</p>{/if}
+
+            <span class="label sub-label">その他のリンク</span>
+            {#each links as link, i (i)}
+              <div class="link-row">
+                <input
+                  type="text"
+                  bind:value={link.title}
+                  placeholder="タイトル"
+                  maxlength="30"
+                  aria-label={`リンク ${i + 1} のタイトル`}
+                />
+                <input
+                  type="url"
+                  bind:value={link.url}
+                  placeholder="https://..."
+                  inputmode="url"
+                  aria-label={`リンク ${i + 1} のURL`}
+                />
+                <button type="button" class="btn btn-sm" onclick={() => removeLink(i)} aria-label="このリンクを削除">
+                  ×
+                </button>
+              </div>
+            {/each}
+            <button
+              type="button"
+              class="btn btn-sm add-link"
+              onclick={addLink}
+              disabled={links.length >= 5}
+            >
+              ＋ リンクを追加
+            </button>
+            {#if links.length >= 5}<p class="hint">リンクは5件までです</p>{/if}
+            {#if fieldErrors['links']}<p class="error-text">{fieldErrors['links']}</p>{/if}
           </div>
 
           <div class="field">
@@ -707,28 +776,6 @@
             <input id="f-tags" type="text" bind:value={tagsText} placeholder="例: くじ引き, Unity" />
             {#if fieldErrors['tags']}<p class="error-text">{fieldErrors['tags']}</p>{/if}
           </div>
-
-          <fieldset class="author-box">
-            <legend>作者情報</legend>
-            <p class="author-note">この欄は先生だけが見ます。他の学生には表示されません。</p>
-            <div class="field">
-              <label for="f-aname">
-                作者名 {#if !isEdit}<span class="req">必須</span>{/if}
-              </label>
-              <input id="f-aname" type="text" bind:value={authorName} maxlength="60" />
-              {#if isEdit}<p class="hint">変更する場合のみ入力してください。</p>{/if}
-              {#if fieldErrors['author_name']}<p class="error-text">{fieldErrors['author_name']}</p>{/if}
-            </div>
-            <div class="field">
-              <label for="f-aclass">クラス</label>
-              <input id="f-aclass" type="text" bind:value={authorClass} maxlength="30" />
-              {#if fieldErrors['author_class']}<p class="error-text">{fieldErrors['author_class']}</p>{/if}
-            </div>
-            <div class="field">
-              <label for="f-anote">連絡メモ（任意）</label>
-              <input id="f-anote" type="text" bind:value={authorNote} />
-            </div>
-          </fieldset>
 
           {#if formError}<div class="error-box">{formError}</div>{/if}
 
@@ -752,23 +799,38 @@
       <div class="stage-center">
       <div class="card done-card">
         <h1>投稿しました</h1>
+
         <p>
+          これは<strong>作品コード</strong>です。あとでアンケートに書いてもらいます。控えておいてください。
+        </p>
+        <div class="key-display">
+          <code class="work-code">{createdCode}</code>
+          <button type="button" class="btn btn-sm" onclick={() => copy('code')}>
+            {copiedField === 'code' ? 'コピーしました' : 'コピー'}
+          </button>
+        </div>
+        {#if copyFailedField === 'code'}
+          <p class="error-text">コピーできませんでした。手動で控えてください</p>
+        {/if}
+
+        <p class="second-key">
           これは<strong>編集キー</strong>です。あとで作品を編集・削除するときに必要です。
         </p>
         <div class="key-display">
           <code>{createdKey}</code>
-          <button type="button" class="btn btn-sm" onclick={copyKey}>
-            {copied ? 'コピーしました' : 'コピー'}
+          <button type="button" class="btn btn-sm" onclick={() => copy('key')}>
+            {copiedField === 'key' ? 'コピーしました' : 'コピー'}
           </button>
         </div>
-        {#if copyFailed}
+        {#if copyFailedField === 'key'}
           <p class="error-text">コピーできませんでした。手動で控えてください</p>
         {/if}
+
         <p class="warn-text">
           この画面を閉じると再表示できません。先生に聞けば再発行できます。
-          （この端末には自動保存されました）
+          （この端末には自動保存され、「編集キーを管理」画面から見返せます）
         </p>
-        {#if videoMode === 'file' && videoFile}
+        {#if videoFile}
           <button type="button" class="btn btn-primary" onclick={() => videoFile && startUpload(videoFile, null)}>
             動画のアップロードへ進む
           </button>
@@ -934,20 +996,6 @@
     font-size: 0.8rem;
   }
 
-  .video-mode {
-    display: flex;
-    gap: 24px;
-    flex-wrap: wrap;
-    margin-bottom: 12px;
-  }
-
-  .radio {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 0.95rem;
-  }
-
   .btn.disabled {
     opacity: 0.45;
     pointer-events: none;
@@ -957,27 +1005,33 @@
     margin-bottom: 8px;
   }
 
-  .author-box {
-    border: var(--hairline);
-    border-radius: var(--radius);
-    background: var(--surface);
-    padding: 20px 20px 8px;
-    margin: 40px 0 0;
+  .links-block > label,
+  .links-block > .sub-label {
+    margin-top: 16px;
   }
 
-  .author-box legend {
-    font-weight: 700;
-    font-size: 0.95rem;
-    padding: 0 8px;
+  .link-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 8px;
   }
 
-  .author-note {
-    background: var(--fill);
-    color: var(--text);
-    border-radius: var(--radius-sm);
-    padding: 8px 12px;
-    font-size: 0.9rem;
-    margin: 0 0 20px;
+  .link-row input:first-child {
+    flex: 1 1 120px;
+  }
+
+  .link-row input:nth-child(2) {
+    flex: 2 1 180px;
+  }
+
+  .add-link {
+    margin-top: 4px;
+  }
+
+  .privacy-note {
+    margin: 0 0 32px;
   }
 
   .submit-row {
@@ -1021,6 +1075,16 @@
     letter-spacing: 0.03em;
     word-break: break-all;
     flex: 1;
+  }
+
+  /* 作品コードは書き写す前提なので、編集キーより大きく字間を空ける */
+  .key-display code.work-code {
+    font-size: 1.5rem;
+    letter-spacing: 0.12em;
+  }
+
+  .second-key {
+    margin-top: 8px;
   }
 
   .warn-text {

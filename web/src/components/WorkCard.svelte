@@ -1,5 +1,6 @@
 <script lang="ts">
   import { fileUrl, type WorkRecord } from '../lib/api';
+  import { plainExcerpt } from '../lib/markdown';
   import { onLinkClick } from '../lib/router';
 
   let {
@@ -19,6 +20,8 @@
         ? fileUrl(work, work.images[0], true)
         : null,
   );
+  // タイトル欄が無いので説明の冒頭を見出しにする（SPEC §9.1）
+  const heading = $derived(plainExcerpt(work.description) || '（説明なし）');
   const converting = $derived(work.video_status === 'processing' || work.video_status === 'uploading');
   const hasVideo = $derived(work.video_status === 'ready' || !!work.video_url);
 </script>
@@ -37,7 +40,7 @@
     {/if}
   </div>
   <div class="meta">
-    <h3 class="title">{work.title}</h3>
+    <h3 class="title">{heading}</h3>
     <span class="likes" class:liked aria-label={`いいね ${work.like_count}件`}>
       <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
         <path

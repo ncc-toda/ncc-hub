@@ -9,6 +9,11 @@ import { getDeviceId, getEventKey } from './keys';
 
 export type VideoStatus = 'none' | 'uploading' | 'processing' | 'ready' | 'failed';
 
+export interface WorkLink {
+  title: string;
+  url: string;
+}
+
 export interface EventRecord {
   id: string;
   collectionId: string;
@@ -27,7 +32,6 @@ export interface WorkRecord {
   collectionId: string;
   collectionName: string;
   event: string;
-  title: string;
   description: string;
   images: string[];
   video: string;
@@ -36,7 +40,9 @@ export interface WorkRecord {
   thumbnail: string;
   video_url: string;
   demo_url: string;
+  github_url: string;
   tags: string[];
+  links: WorkLink[];
   like_count: number;
   created: string;
   updated: string;
@@ -139,6 +145,8 @@ function normalizeWork(w: WorkRecord): WorkRecord {
     ...w,
     images: Array.isArray(w.images) ? w.images : [],
     tags: Array.isArray(w.tags) ? w.tags : [],
+    links: Array.isArray(w.links) ? w.links : [],
+    github_url: typeof w.github_url === 'string' ? w.github_url : '',
     like_count: typeof w.like_count === 'number' ? w.like_count : 0,
   };
 }
@@ -193,16 +201,17 @@ export function fileUrl(
 
 // ---- 書き込み（カスタムAPI /api/x/） ------------------------------------
 
+/** 編集キーと作品コードが返るのはこの呼び出しだけ（SPEC §8.2 手順7）。 */
 export async function createWork(
   slug: string,
   form: FormData,
-): Promise<{ work: WorkRecord; edit_key: string }> {
-  const r = await apiFetch<{ work: WorkRecord; edit_key: string }>(
+): Promise<{ work: WorkRecord; edit_key: string; work_code: string }> {
+  const r = await apiFetch<{ work: WorkRecord; edit_key: string; work_code: string }>(
     '/api/x/works',
     { method: 'POST', body: form },
     { slug },
   );
-  return { work: normalizeWork(r.work), edit_key: r.edit_key };
+  return { work: normalizeWork(r.work), edit_key: r.edit_key, work_code: r.work_code };
 }
 
 export async function updateWork(

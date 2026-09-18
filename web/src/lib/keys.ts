@@ -4,12 +4,14 @@
  *   works.deviceId   … UUID v4（初回生成）
  *   works.eventKeys  … { [slug]: passphrase }
  *   works.editKeys   … { [workId]: editKey }
+ *   works.workCodes  … { [workId]: workCode }（アンケート突合用、表示のみ）
  *   works.uploads    … { [workId]: { uploadId, size, ext, totalChunks } }
  */
 
 const DEVICE_ID_KEY = 'works.deviceId';
 const EVENT_KEYS_KEY = 'works.eventKeys';
 const EDIT_KEYS_KEY = 'works.editKeys';
+const WORK_CODES_KEY = 'works.workCodes';
 const UPLOADS_KEY = 'works.uploads';
 
 export interface StoredUpload {
@@ -98,6 +100,24 @@ export function removeEditKey(workId: string): void {
   const keys = getEditKeys();
   delete keys[workId];
   writeJson(EDIT_KEYS_KEY, keys);
+}
+
+// ---- 作品コード（アンケート突合用。SPEC §8.2） --------------------------
+
+export function getWorkCodes(): Record<string, string> {
+  return readJson<Record<string, string>>(WORK_CODES_KEY, {});
+}
+
+export function setWorkCode(workId: string, code: string): void {
+  const codes = getWorkCodes();
+  codes[workId] = code;
+  writeJson(WORK_CODES_KEY, codes);
+}
+
+export function removeWorkCode(workId: string): void {
+  const codes = getWorkCodes();
+  delete codes[workId];
+  writeJson(WORK_CODES_KEY, codes);
 }
 
 // ---- 分割アップロードの再開情報 -----------------------------------------

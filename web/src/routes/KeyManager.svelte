@@ -3,13 +3,16 @@
   import {
     getEditKeys,
     getEventKeys,
+    getWorkCodes,
     removeEditKey,
     removeEventKey,
+    removeWorkCode,
     setEditKey,
   } from '../lib/keys';
 
   let editKeys = $state<Record<string, string>>(getEditKeys());
   let eventKeys = $state<Record<string, string>>(getEventKeys());
+  let workCodes = $state<Record<string, string>>(getWorkCodes());
 
   let newWorkId = $state('');
   let newKey = $state('');
@@ -20,11 +23,13 @@
   function refresh() {
     editKeys = getEditKeys();
     eventKeys = getEventKeys();
+    workCodes = getWorkCodes();
   }
 
   function onRemoveEditKey(workId: string) {
-    if (!confirm('この編集キーを端末から削除しますか？（作品自体は消えません）')) return;
+    if (!confirm('この編集キーと作品コードを端末から削除しますか？（作品自体は消えません）')) return;
     removeEditKey(workId);
+    removeWorkCode(workId);
     refresh();
   }
 
@@ -49,13 +54,13 @@
     refresh();
   }
 
-  async function copy(workId: string, key: string) {
+  async function copy(target: string, value: string) {
     copyFailedId = '';
-    if (await copyText(key)) {
-      copiedId = workId;
+    if (await copyText(value)) {
+      copiedId = target;
       setTimeout(() => (copiedId = ''), 2000);
     } else {
-      copyFailedId = workId;
+      copyFailedId = target;
       setTimeout(() => (copyFailedId = ''), 2000);
     }
   }
@@ -67,6 +72,7 @@
 <h1>編集キーを管理</h1>
 <p class="hint">
   この端末に保存されている鍵の一覧です。別の端末で投稿した作品を編集したいときは、編集キーを手入力で追加できます。
+  作品コードはアンケートに書くときに使います。
 </p>
 
 <section class="card section">
@@ -79,6 +85,22 @@
         <li>
           <div class="key-info">
             <span class="work-id">作品ID：{workId}</span>
+            {#if workCodes[workId]}
+              <span class="code-row">
+                作品コード：<code class="work-code">{workCodes[workId]}</code>
+                <button
+                  type="button"
+                  class="btn btn-sm"
+                  onclick={() => copy(workId + ':code', workCodes[workId])}
+                >
+                  {copiedId === workId + ':code'
+                    ? 'コピーしました'
+                    : copyFailedId === workId + ':code'
+                      ? 'コピーできません'
+                      : 'コピー'}
+                </button>
+              </span>
+            {/if}
             <code>{key}</code>
           </div>
           <div class="key-actions">
@@ -87,7 +109,7 @@
                 ? 'コピーしました'
                 : copyFailedId === workId
                   ? 'コピーできません'
-                  : 'コピー'}
+                  : '編集キーをコピー'}
             </button>
             <button type="button" class="btn btn-sm btn-danger" onclick={() => onRemoveEditKey(workId)}>
               削除
@@ -185,6 +207,23 @@
   .key-info code {
     word-break: break-all;
     font-size: 0.9rem;
+  }
+
+  .code-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    font-size: 13px;
+    color: var(--muted);
+    margin: 2px 0;
+  }
+
+  .code-row .work-code {
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--text);
   }
 
   .key-actions {
